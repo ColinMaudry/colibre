@@ -619,7 +619,7 @@ def _auth_nav(_, pathname=None):
             href += f"?next={pathname}"
         return dbc.NavItem(
             dbc.NavLink(
-                [html.Span("Espace"), html.Br(), html.Span("abonné·e")],
+                [html.Span("Espace"), html.Br(), html.Span("abonné")],
                 href=href,
                 style={
                     "color": "var(--primary-color-text)",
@@ -629,6 +629,8 @@ def _auth_nav(_, pathname=None):
                     "justifyContent": "center",
                     "lineHeight": "1.1",
                     "height": "100%",
+                    "paddingTop": "10px",
+                    "paddingBottom": "10px",
                 },
             )
         )
@@ -644,7 +646,7 @@ def _auth_nav(_, pathname=None):
         for section in visible_sections(current_user_has_subscription())
     ]
     return dbc.DropdownMenu(
-        label="Espace abonné·e",
+        label="Espace abonné",
         nav=True,
         in_navbar=True,
         # Le menu est en bout de navbar (`ms-auto`) : aligné à gauche, il

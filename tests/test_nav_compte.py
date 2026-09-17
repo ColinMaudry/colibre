@@ -32,7 +32,7 @@ def test_mon_compte_ouvre_un_menu_au_lieu_de_naviguer(monkeypatch):
     """Le cœur de l'issue : le libellé déclenche un menu, il ne navigue plus."""
     menu = _menu(monkeypatch, has_subscription=True)
     assert isinstance(menu, dbc.DropdownMenu)
-    assert menu.label == "Espace abonné·e"
+    assert menu.label == "Espace abonné"
 
 
 def test_menu_liste_toutes_les_sections_pour_un_abonne(monkeypatch):
@@ -77,7 +77,7 @@ def test_visiteur_anonyme_garde_le_lien_connexion(monkeypatch):
     monkeypatch.setattr(app_module, "current_user", _fake_user(False))
     rendu = str(app_module._auth_nav(None))
     assert "Espace" in rendu
-    assert "abonné·e" in rendu
+    assert "abonné" in rendu
     assert "/connexion" in rendu
     assert "Mon compte" not in rendu
 
