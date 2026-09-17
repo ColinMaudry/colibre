@@ -621,7 +621,15 @@ def _auth_nav(_, pathname=None):
             dbc.NavLink(
                 [html.Span("Espace"), html.Br(), html.Span("abonné·e")],
                 href=href,
-                style={"color": "var(--primary-color-text)"},
+                style={
+                    "color": "var(--primary-color-text)",
+                    "textAlign": "center",
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "justifyContent": "center",
+                    "lineHeight": "1.1",
+                    "height": "100%",
+                },
             )
         )
 
