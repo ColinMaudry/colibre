@@ -50,9 +50,28 @@ def layout(error: str | None = None, email: str | None = None, **kwargs):
 
     next_url = kwargs.get("next", "")
 
-    return dbc.Container(
-        className="py-4",
-        style={"maxWidth": "500px"},
+    left_col = dbc.Col(
+        md=5,
+        children=[
+            html.H4("Pas encore de compte ?"),
+            html.P(
+                "Découvrez les abonnements disponibles et leurs avantages.",
+                className="text-muted",
+            ),
+            html.A(
+                "Voir les abonnements disponibles et leurs avantages",
+                href="/projet/abonnement",
+                className="btn btn-secondary",
+            ),
+        ],
+        style={
+            "borderRight": "1px solid var(--bs-border-color)",
+            "paddingRight": "2rem",
+        },
+    )
+
+    right_col = dbc.Col(
+        md=7,
         children=[
             html.H2("Connexion"),
             *alerts,
@@ -91,11 +110,14 @@ def layout(error: str | None = None, email: str | None = None, **kwargs):
             ),
             html.Div("ou", className="text-center text-muted my-2"),
             linkedin_button(next_url),
-            html.Div("ou", className="text-center text-muted my-2"),
-            html.A(
-                "Pas encore de compte ? Voir les abonnements",
-                href="/projet/abonnement",
-                className="btn btn-secondary w-100",
-            ),
+        ],
+        style={"paddingLeft": "2rem"},
+    )
+
+    return dbc.Container(
+        className="py-4",
+        style={"maxWidth": "800px"},
+        children=[
+            dbc.Row([left_col, right_col], className="align-items-start g-4"),
         ],
     )

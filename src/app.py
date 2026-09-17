@@ -617,7 +617,13 @@ def _auth_nav(_, pathname=None):
         href = "/connexion"
         if pathname and pathname not in _AUTH_PAGES:
             href += f"?next={pathname}"
-        return dbc.NavItem(dbc.NavLink("Connexion", href=href))
+        return dbc.NavItem(
+            dbc.NavLink(
+                [html.Span("Espace"), html.Br(), html.Span("abonné·e")],
+                href=href,
+                style={"color": "var(--primary-color-text)"},
+            )
+        )
 
     from src.pages._compte_shell import (
         current_user_has_subscription,
@@ -630,7 +636,7 @@ def _auth_nav(_, pathname=None):
         for section in visible_sections(current_user_has_subscription())
     ]
     return dbc.DropdownMenu(
-        label="Mon compte",
+        label="Espace abonné·e",
         nav=True,
         in_navbar=True,
         # Le menu est en bout de navbar (`ms-auto`) : aligné à gauche, il
