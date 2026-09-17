@@ -55,13 +55,13 @@ def layout(error: str | None = None, email: str | None = None, **kwargs):
         children=[
             html.H4("Pas encore de compte ?"),
             html.P(
-                "Découvrez les abonnements disponibles et leurs avantages.",
-                className="text-muted",
-            ),
-            html.A(
-                "Voir les abonnements disponibles et leurs avantages",
-                href="/projet/abonnement",
-                className="btn btn-secondary",
+                [
+                    "Découvrez ",
+                    dcc.Link(
+                        "les abonnements disponibles et leurs avantages",
+                        href="/projet/abonnement",
+                    ),
+                ]
             ),
         ],
         style={
