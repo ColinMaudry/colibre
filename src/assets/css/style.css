@@ -99,6 +99,16 @@ a.btn.btn-primary:hover {
   background-color: var(--btn-terracotta-hover);
 }
 
+/* Spécificité (0,3,1) > `:not(.btn-check) + .btn:active` de Bootstrap
+   (0,3,0), qui sinon impose sa couleur Simplex (#ae1c0c + blanc) au clic. */
+button.btn.btn-primary:active,
+a.btn.btn-primary:active {
+  color: var(--btn-terracotta-text);
+  background-image: none;
+  background-color: var(--btn-terracotta-hover);
+  border-color: var(--btn-terracotta-hover);
+}
+
 /* --- PRIMARY outline : action affirmative de moindre emphase --- */
 .btn.btn-outline-primary {
   color: var(--btn-terracotta);
@@ -1355,6 +1365,12 @@ input[type="number"] {
   --btn-secondary-text: var(--earth-fg);
   --btn-secondary-border: var(--earth-border);
   --btn-secondary-hover-bg: var(--earth-bg-3);
+  /* #c0392b (défaut clair) ≈ 2.8:1 sur --earth-bg ; #ff645a remonte le
+     texte/bordure outline à ~5.2:1. Le blanc par défaut de
+     --btn-danger-text ne tenant que ~2.9:1 sur ce rouge plus clair, on le
+     bascule aussi en texte foncé (~6.3:1) pour le bouton danger plein. */
+  --btn-danger: #ff645a;
+  --btn-danger-text: #121418;
 
   /* AG Grid */
   --ag-background-color: var(--earth-bg);
@@ -1365,6 +1381,7 @@ input[type="number"] {
   --ag-row-hover-color: var(--earth-bg-3);
   --ag-border-color: var(--earth-border);
   --ag-secondary-foreground-color: var(--earth-muted);
+  --ag-accent-color: var(--earth-primary);
 
   /* Composants dcc (Dash 4) : variables --Dash-Fill-*, --Dash-Text-*,
      --Dash-Stroke-* de fond, texte et bordure, recensées par un grep
@@ -1406,10 +1423,6 @@ input[type="number"] {
   background-color: var(--earth-bg-2) !important;
 }
 
-[data-bs-theme="dark"] a {
-  color: var(--earth-link);
-}
-
 /* Alertes : fond sombre teinté, bordure et titre à la couleur Earthsong */
 [data-bs-theme="dark"] .alert-warning {
   --bs-alert-bg: #3a2f1c;
@@ -1441,10 +1454,19 @@ input[type="number"] {
 /* --- Inventaire (Step 4) : couleurs en dur du reste de style.css --- */
 
 /* Boutons désactivés (gris clair illisible sur fond sombre) */
-[data-bs-theme="dark"] .btn[disabled],
-[data-bs-theme="dark"] button[disabled] {
+[data-bs-theme="dark"] .btn[disabled]:not(.btn-primary),
+[data-bs-theme="dark"] button[disabled]:not(.btn-primary) {
   border-color: var(--earth-border);
   color: var(--earth-muted);
+}
+
+/* Bouton primaire désactivé : le gris ci-dessus (--earth-muted, #968c83)
+   tombe à ~1.3:1 sur le fond terracotta ; on garde le texte foncé du
+   bouton primaire actif (~5.7:1 sur --earth-primary), inchangé au repos. */
+[data-bs-theme="dark"] .btn.btn-primary[disabled],
+[data-bs-theme="dark"] button.btn-primary[disabled] {
+  color: var(--btn-terracotta-text);
+  border-color: var(--earth-border);
 }
 
 /* Bordure des champs texte/nombre du tableau de bord */
