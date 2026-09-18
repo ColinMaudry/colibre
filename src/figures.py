@@ -15,9 +15,81 @@ from dash_extensions.javascript import Namespace
 from polars.exceptions import ColumnNotFoundError
 
 from src.db import schema
+from src.theme import SOMBRE, current_theme
 from src.utils import logger
 from src.utils.data import DATA_SCHEMA, DEPARTEMENTS_GEOJSON, schema_field_rows
 from src.utils.table import add_links, format_number, setup_table_columns
+
+ORG_COLORS = {
+    "acheteur": "#E69F00",  # orange
+    "titulaire": "#56B4E9",  # bleu ciel
+}
+
+
+# Mode sombre (#118) : palette Earthsong, plus sombre que les palettes du
+# thème clair mais contrastée entre ses teintes.
+FOND_SOMBRE = "#292520"
+TEXTE_SOMBRE = "#e5c7a9"
+GRILLE_SOMBRE = "#675f54"
+
+PALETTE_SOMBRE = [
+    "#c94234",
+    "#1398b9",
+    "#85c54c",
+    "#f5ae2e",
+    "#d0633d",
+    "#509552",
+    "#e0d561",
+    "#5fdaff",
+    "#ff9269",
+    "#84f088",
+    "#ff645a",
+    "#98e036",
+]
+
+
+def _assombrir(hex_color: str, facteur: float) -> str:
+    r, g, b = (int(hex_color[i : i + 2], 16) for i in (1, 3, 5))
+    return "#{:02x}{:02x}{:02x}".format(*(round(c * (1 - facteur)) for c in (r, g, b)))
+
+
+# ~24 sources dans le graphique des sources : la palette Earthsong puis ses
+# variantes assombries, pour 24 teintes distinctes (équivalent sombre de Dark24).
+PALETTE_SOMBRE_24 = PALETTE_SOMBRE + [_assombrir(c, 0.4) for c in PALETTE_SOMBRE]
+
+ECHELLE_SOMBRE = [FOND_SOMBRE, "#e06c57"]
+
+ORG_COLORS_SOMBRE = {
+    "acheteur": "#f5ae2e",  # jaune Earthsong
+    "titulaire": "#1398b9",  # bleu Earthsong
+}
+
+
+def _theme(theme: str | None) -> str:
+    return theme or current_theme()
+
+
+def org_colors(theme: str) -> dict[str, str]:
+    return ORG_COLORS_SOMBRE if theme == SOMBRE else ORG_COLORS
+
+
+def appliquer_theme(fig: go.Figure, theme: str) -> go.Figure:
+    """Fond, police et grille Earthsong en sombre ; sans effet en clair."""
+    if theme != SOMBRE:
+        return fig
+    fig.update_layout(
+        paper_bgcolor=FOND_SOMBRE,
+        plot_bgcolor=FOND_SOMBRE,
+        font_color=TEXTE_SOMBRE,
+    )
+    fig.update_xaxes(
+        gridcolor=GRILLE_SOMBRE, linecolor=GRILLE_SOMBRE, zerolinecolor=GRILLE_SOMBRE
+    )
+    fig.update_yaxes(
+        gridcolor=GRILLE_SOMBRE, linecolor=GRILLE_SOMBRE, zerolinecolor=GRILLE_SOMBRE
+    )
+    fig.update_geos(bgcolor=FOND_SOMBRE)
+    return fig
 
 
 def get_yearly_statistics(statistics, today_str) -> html.Div:
@@ -59,7 +131,8 @@ def get_yearly_statistics(statistics, today_str) -> html.Div:
     return html.Div(children=table, className="marches_table")
 
 
-def get_barchart_sources(lff: pl.LazyFrame, type_date: str):
+def get_barchart_sources(lff: pl.LazyFrame, type_date: str, theme: str | None = None):
+    theme = _theme(theme)
     labels = {
         "dateNotification": "notification",
         "datePublicationDonnees": "publication des données",
@@ -110,13 +183,16 @@ def get_barchart_sources(lff: pl.LazyFrame, type_date: str):
         x=type_date,
         y="len",
         color="sourceDataset",
-        color_discrete_sequence=px.colors.qualitative.Dark24,
+        color_discrete_sequence=(
+            PALETTE_SOMBRE_24 if theme == SOMBRE else px.colors.qualitative.Dark24
+        ),
         labels={
             "len": "Nombre de marchés",
             type_date: f"Mois de {labels[type_date]}",
             "sourceDataset": "Source de données",
         },
     )
+    fig = appliquer_theme(fig, theme)
 
     graph = dcc.Graph(figure=fig)
 
@@ -283,11 +359,12 @@ class DataTable(dash_table.DataTable):
         )
 
 
-def get_duplicate_matrix() -> dcc.Graph:
+def get_duplicate_matrix(theme: str | None = None) -> dcc.Graph:
     """
     Fonction développée avec l'aide de la LLM Euria d'Infomaniak.
     :return:
     """
+    theme = _theme(theme)
     lff = pl.scan_parquet(
         "https://www.data.gouv.fr/api/1/datasets/r/a545bf6c-8b24-46ed-b49f-a32bf02eaffa"
     ).sort("sourceDataset")
@@ -303,16 +380,21 @@ def get_duplicate_matrix() -> dcc.Graph:
     y_labels = dff["sourceDataset"].to_list()
 
     # Create heatmap
+    colorscale = (
+        [[0.0, FOND_SOMBRE], [0.10, "#d0633d"], [1.0, "#ff9269"]]
+        if theme == SOMBRE
+        else [
+            [0.0, "white"],  # 0% → white
+            [0.10, "lightsalmon"],  # 10% → light warm tone
+            [1.0, "darkred"],  # 100% → deep red
+        ]
+    )
     fig = go.Figure(
         data=go.Heatmap(
             z=z_data,
             x=x_labels,
             y=y_labels,
-            colorscale=[
-                [0.0, "white"],  # 0% → white
-                [0.10, "lightsalmon"],  # 10% → light warm tone
-                [1.0, "darkred"],  # 100% → deep red
-            ],
+            colorscale=colorscale,
             zmin=0,
             zmax=1,
             hoverongaps=False,
@@ -341,24 +423,22 @@ def get_duplicate_matrix() -> dcc.Graph:
         font=dict(size=11),  # Overall font size
         margin=dict(l=100, r=50, t=80, b=100),  # Add margin for labels
     )
+    fig = appliquer_theme(fig, theme)
 
     return dcc.Graph(figure=fig)
 
 
-ORG_COLORS = {
-    "acheteur": "#E69F00",  # orange
-    "titulaire": "#56B4E9",  # bleu ciel
-}
-
-
 def build_org_markers(
-    lff: pl.LazyFrame, org_type: Literal["acheteur", "titulaire"]
+    lff: pl.LazyFrame,
+    org_type: Literal["acheteur", "titulaire"],
+    theme: str | None = None,
 ) -> list[dict]:
     """Regroupe les marchés par point géographique pour un type d'organisme.
 
     Renvoie [] (sans exception) si les colonnes longitude/latitude de ce
     type sont absentes du LazyFrame (ex: tests/test.parquet).
     """
+    theme = _theme(theme)
     lon_col = f"{org_type}_longitude"
     lat_col = f"{org_type}_latitude"
     nom_col = f"{org_type}_nom"
@@ -379,16 +459,19 @@ def build_org_markers(
             "lat": row[lat_col],
             "lon": row[lon_col],
             "tooltip": f"{row[nom_col]} ({row['nb_marches']} marchés)",
-            "marker_color": ORG_COLORS[org_type],
+            "marker_color": org_colors(theme)[org_type],
         }
         for row in lff_org.collect().to_dicts()
     ]
 
 
-def get_geographic_maps(dff: pl.DataFrame) -> list[dbc.Col] | list:
+def get_geographic_maps(
+    dff: pl.DataFrame, theme: str | None = None
+) -> list[dbc.Col] | list:
     """
     Génère les cartes géographiques pour l'hexagone et les DOM-TOM.
     """
+    theme = _theme(theme)
 
     regions: dict = {
         "Hexagone": {
@@ -467,7 +550,7 @@ def get_geographic_maps(dff: pl.DataFrame) -> list[dbc.Col] | list:
         else:
             _map_type: str = "clusters"
             for org_type in ["acheteur", "titulaire"]:
-                dfs.append(build_org_markers(lff, org_type))
+                dfs.append(build_org_markers(lff, org_type, theme=theme))
 
         return dfs, _map_type
 
@@ -477,9 +560,9 @@ def get_geographic_maps(dff: pl.DataFrame) -> list[dbc.Col] | list:
         regions[code]["data"], map_type = make_map_data(code)
 
         if map_type == "chloropleth":
-            map_graph = make_chloropleth_map(regions[code])
+            map_graph = make_chloropleth_map(regions[code], theme=theme)
         elif map_type == "clusters":
-            map_graph = make_clusters_map(regions[code])
+            map_graph = make_clusters_map(regions[code], theme=theme)
         elif map_type is None:
             continue
         else:
@@ -495,7 +578,8 @@ def get_geographic_maps(dff: pl.DataFrame) -> list[dbc.Col] | list:
     return cols
 
 
-def make_chloropleth_map(region: dict) -> dcc.Graph:
+def make_chloropleth_map(region: dict, theme: str | None = None) -> dcc.Graph:
+    theme = _theme(theme)
     df_map = region["data"][0]
 
     fig = px.choropleth(
@@ -503,7 +587,7 @@ def make_chloropleth_map(region: dict) -> dcc.Graph:
         geojson=DEPARTEMENTS_GEOJSON,
         locations="Département",
         color="uid",
-        color_continuous_scale="Reds",
+        color_continuous_scale=ECHELLE_SOMBRE if theme == SOMBRE else "Reds",
         range_color=(df_map["uid"].min(), df_map["uid"].max()),
         labels={"uid": "Marchés attribués"},
         scope="europe",
@@ -518,12 +602,14 @@ def make_chloropleth_map(region: dict) -> dcc.Graph:
             "domain": {"x": [0, 1], "y": [0, 1]},
         }
     )
+    fig = appliquer_theme(fig, theme)
 
     graph = dcc.Graph(figure=fig, config={"displayModeBar": False})
     return graph
 
 
-def make_clusters_map(region: dict) -> html.Div:
+def make_clusters_map(region: dict, theme: str | None = None) -> html.Div:
+    theme = _theme(theme)
     # JavaScript functions for styling
     ns = Namespace("dash_clientside", "leaflet")
     point_to_layer = ns("pointToLayer")
@@ -536,8 +622,9 @@ def make_clusters_map(region: dict) -> html.Div:
     region_titulaires = region["data"][1]
 
     # Couleurs
-    color_acheteur = ORG_COLORS["acheteur"]
-    color_titulaire = ORG_COLORS["titulaire"]
+    colors = org_colors(theme)
+    color_acheteur = colors["acheteur"]
+    color_titulaire = colors["titulaire"]
 
     acheteurs_geojson_data = dlx.dicts_to_geojson(region_acheteurs)
     titulaires_geojson_data = dlx.dicts_to_geojson(region_titulaires)
@@ -576,8 +663,9 @@ def make_clusters_map(region: dict) -> html.Div:
     )
 
     # Légende superposée en bas à gauche : rappelle la couleur des points
-    # acheteur (orange) et titulaire (bleu). Les couleurs viennent de
-    # ORG_COLORS pour rester synchrones avec les marqueurs.
+    # acheteur et titulaire. Les couleurs viennent de org_colors(theme) pour
+    # rester synchrones avec les marqueurs (#118 : palette sombre en mode
+    # sombre).
     legend = html.Div(
         [
             html.Div(
@@ -658,6 +746,7 @@ def get_org_location_map(
     dff: pl.DataFrame,
     home_type: Literal["acheteur", "titulaire"],
     map_id: str,
+    theme: str | None = None,
 ) -> dl.Map:
     """Carte cluster (dash-leaflet) d'un organisme et de sa contrepartie.
 
@@ -669,10 +758,11 @@ def get_org_location_map(
     sont utilisés plutôt que la prop `bounds` de dash-leaflet, qui lève une
     exception au premier montage du composant (bug connu de la librairie).
     """
+    theme = _theme(theme)
     lff = dff.lazy()
     markers_by_type = {
-        "acheteur": build_org_markers(lff, "acheteur"),
-        "titulaire": build_org_markers(lff, "titulaire"),
+        "acheteur": build_org_markers(lff, "acheteur", theme=theme),
+        "titulaire": build_org_markers(lff, "titulaire", theme=theme),
     }
     for marker in markers_by_type[home_type]:
         marker["is_home"] = True
@@ -699,7 +789,7 @@ def get_org_location_map(
                 pointToLayer=point_to_layer,
                 clusterToLayer=cluster_to_layer,
                 id=f"{map_id}-{org_type}",
-                options={"fillColor": ORG_COLORS[org_type]},
+                options={"fillColor": org_colors(theme)[org_type]},
             )
         )
 
@@ -719,7 +809,8 @@ def get_org_location_map(
     )
 
 
-def get_distance_histogram(lff: pl.LazyFrame) -> dcc.Graph:
+def get_distance_histogram(lff: pl.LazyFrame, theme: str | None = None) -> dcc.Graph:
+    theme = _theme(theme)
     if "titulaire_distance" not in lff.collect_schema().names():
         dff = pl.DataFrame({"titulaire_distance": pl.Series([], dtype=pl.Float64)})
     else:
@@ -761,6 +852,7 @@ def get_distance_histogram(lff: pl.LazyFrame) -> dcc.Graph:
                 width=bin_widths,
                 hovertext=hover_texts,
                 hoverinfo="text",
+                marker_color="#e06c57" if theme == SOMBRE else None,
             )
         )
         fig.update_layout(bargap=0)
@@ -772,6 +864,7 @@ def get_distance_histogram(lff: pl.LazyFrame) -> dcc.Graph:
         title_text="Distance (km)",
     )
     fig.update_yaxes(title_text="Nombre de marchés")
+    fig = appliquer_theme(fig, theme)
     return dcc.Graph(figure=fig)
 
 
@@ -867,10 +960,15 @@ def compute_considerations_stats(lff: pl.LazyFrame) -> dict[str, tuple[int, int,
     return stats
 
 
-# (clé stats, libellé, couleur)
+# (clé stats, libellé, couleur claire, couleur sombre)
 CONSIDERATIONS_RENSEIGNEES = [
-    ("sociales_renseignees", "Considérations sociales", "#CC6677"),
-    ("environnementales_renseignees", "Considérations environnementales", "#117733"),
+    ("sociales_renseignees", "Considérations sociales", "#CC6677", "#d0633d"),
+    (
+        "environnementales_renseignees",
+        "Considérations environnementales",
+        "#117733",
+        "#85c54c",
+    ),
 ]
 
 
@@ -882,11 +980,15 @@ def _progress_bar(pct: int, color: str) -> dbc.Progress:
     )
 
 
-def get_considerations_card_content(lff: pl.LazyFrame) -> html.Div:
+def get_considerations_card_content(
+    lff: pl.LazyFrame, theme: str | None = None
+) -> html.Div:
     """Trois barres : champs renseignés + part positive pour sociales et environnementales."""
+    theme = _theme(theme)
     stats = compute_considerations_stats(lff)
 
     count_ren, pct_ren = stats["champs_renseignes"]
+    couleur_neutre = GRILLE_SOMBRE if theme == SOMBRE else "#6c757d"
     blocks = [
         html.Div(
             className="mb-3",
@@ -901,12 +1003,13 @@ def get_considerations_card_content(lff: pl.LazyFrame) -> html.Div:
                         ),
                     ],
                 ),
-                _progress_bar(pct_ren, "#6c757d"),
+                _progress_bar(pct_ren, couleur_neutre),
             ],
         )
     ]
 
-    for key, label, color in CONSIDERATIONS_RENSEIGNEES:
+    for key, label, color_clair, color_sombre in CONSIDERATIONS_RENSEIGNEES:
+        color = color_sombre if theme == SOMBRE else color_clair
         total_count, count, pct = stats[key]
         blocks.append(
             html.Div(
@@ -1001,7 +1104,9 @@ def make_donut(
     per_uid: bool,
     nulls="?",
     potentially_many_names: bool = False,
+    theme: str | None = None,
 ):
+    theme = _theme(theme)
     title = DATA_SCHEMA[names_col]["title"]
     lff = lff.rename({names_col: title})
     lff = lff.select("uid", title)
@@ -1032,7 +1137,9 @@ def make_donut(
         values="Nombre",
         names=title,
         hole=0.4,
-        color_discrete_sequence=px.colors.qualitative.Safe,
+        color_discrete_sequence=(
+            PALETTE_SOMBRE if theme == SOMBRE else px.colors.qualitative.Safe
+        ),
         custom_data=["Nombre_fmt"],
     )
     fig = fig.update_traces(
@@ -1040,6 +1147,7 @@ def make_donut(
         hovertemplate="<b>%{label}</b><br>%{customdata[0]}<extra></extra>",
     )
     fig = fig.update_layout(showlegend=False, font=dict(size=14))
+    fig = appliquer_theme(fig, theme)
     graph = dcc.Graph(figure=fig)
     if potentially_many_names:
         return graph, nb_names
@@ -1442,7 +1550,9 @@ def observatoire_cards_columns() -> list[str]:
     return [c for c in OBSERVATOIRE_CARDS_COLUMNS if c in schema.names()]
 
 
-def build_dashboard_cards(dff: pl.DataFrame, order: list[str] | None = None) -> list:
+def build_dashboard_cards(
+    dff: pl.DataFrame, order: list[str] | None = None, theme: str | None = None
+) -> list:
     """Cards de l'observatoire pour un jeu de marchés déjà filtré.
 
     Partagé par la page /observatoire (filtres du panneau latéral) et par le
@@ -1456,7 +1566,11 @@ def build_dashboard_cards(dff: pl.DataFrame, order: list[str] | None = None) -> 
     par un cache mémoïsé doivent laisser `order` à None et appliquer
     `reorder_cards` sur le résultat, pour ne pas multiplier les entrées de
     cache par le nombre d'ordres possibles.
+
+    `theme` (#118) est résolu une seule fois ici et transmis à toutes les
+    figures construites, pour éviter un appel current_theme() par figure.
     """
+    theme = _theme(theme)
     lff = dff.lazy()
 
     df_per_uid = (
@@ -1476,6 +1590,7 @@ def build_dashboard_cards(dff: pl.DataFrame, order: list[str] | None = None) -> 
         nulls="Autres",
         per_uid=True,
         potentially_many_names=True,
+        theme=theme,
     )
     cards.append(
         make_card(
@@ -1489,7 +1604,7 @@ def build_dashboard_cards(dff: pl.DataFrame, order: list[str] | None = None) -> 
     )
 
     donut_titulaire_categorie = make_donut(
-        lff, "titulaire_categorie", per_uid=False, nulls="?"
+        lff, "titulaire_categorie", per_uid=False, nulls="?", theme=theme
     )
     cards.append(
         make_card(
@@ -1500,7 +1615,7 @@ def build_dashboard_cards(dff: pl.DataFrame, order: list[str] | None = None) -> 
         )
     )
 
-    donut_marche_type = make_donut(lff, "type", per_uid=True, nulls="?")
+    donut_marche_type = make_donut(lff, "type", per_uid=True, nulls="?", theme=theme)
     cards.append(
         make_card(
             title="Type d'achat",
@@ -1510,7 +1625,7 @@ def build_dashboard_cards(dff: pl.DataFrame, order: list[str] | None = None) -> 
         )
     )
 
-    considerations_content = get_considerations_card_content(lff)
+    considerations_content = get_considerations_card_content(lff, theme=theme)
     cards.append(
         make_card(
             title="Considérations sociales et environnementales",
@@ -1520,7 +1635,7 @@ def build_dashboard_cards(dff: pl.DataFrame, order: list[str] | None = None) -> 
         )
     )
 
-    distance_histogram = get_distance_histogram(lff)
+    distance_histogram = get_distance_histogram(lff, theme=theme)
     cards.append(
         make_card(
             title="Distance acheteur–titulaire",
@@ -1556,10 +1671,12 @@ def build_dashboard_cards(dff: pl.DataFrame, order: list[str] | None = None) -> 
         )
     )
 
-    geographic_maps: list[dbc.Col] | None = get_geographic_maps(dff)
+    geographic_maps: list[dbc.Col] | None = get_geographic_maps(dff, theme=theme)
 
     other_cards = []
-    sources_barchart = get_barchart_sources(lff, type_date="dateNotification")
+    sources_barchart = get_barchart_sources(
+        lff, type_date="dateNotification", theme=theme
+    )
     other_cards.append(
         make_card(
             title="Sources de données",

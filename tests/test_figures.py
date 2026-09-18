@@ -659,3 +659,287 @@ def test_reorder_cards_ordre_vide_ne_change_rien():
     cards = build_dashboard_cards(dff)
 
     assert _card_ids(reorder_cards(cards, [])) == _card_ids(cards)
+
+
+# --- Mode sombre (#118) : palettes Earthsong et paramètre theme -------------
+
+
+def _find_components(component, cls, found=None):
+    """Cherche récursivement les composants d'une classe donnée (children
+    Dash pouvant être une liste, un composant unique, ou une chaîne)."""
+    if found is None:
+        found = []
+    if isinstance(component, cls):
+        found.append(component)
+    children = getattr(component, "children", None)
+    if isinstance(children, (list, tuple)):
+        for c in children:
+            _find_components(c, cls, found)
+    elif children is not None:
+        _find_components(children, cls, found)
+    return found
+
+
+def test_appliquer_theme_sombre_pose_fond_police_et_grille():
+    import plotly.graph_objects as go
+
+    from src.figures import FOND_SOMBRE, TEXTE_SOMBRE, appliquer_theme
+    from src.theme import SOMBRE
+
+    fig = go.Figure()
+    fig = appliquer_theme(fig, SOMBRE)
+
+    assert fig.layout.paper_bgcolor == FOND_SOMBRE
+    assert fig.layout.plot_bgcolor == FOND_SOMBRE
+    assert fig.layout.font.color == TEXTE_SOMBRE
+
+
+def test_appliquer_theme_clair_laisse_le_rendu_inchange():
+    """Comparaison avec la figure avant l'appel (pas avec None) : le thème
+    clair ne doit poser aucune de ces propriétés."""
+    import plotly.graph_objects as go
+
+    from src.figures import appliquer_theme
+    from src.theme import CLAIR
+
+    fig = go.Figure()
+    avant = (
+        fig.layout.paper_bgcolor,
+        fig.layout.plot_bgcolor,
+        fig.layout.font.color,
+    )
+
+    fig = appliquer_theme(fig, CLAIR)
+
+    apres = (
+        fig.layout.paper_bgcolor,
+        fig.layout.plot_bgcolor,
+        fig.layout.font.color,
+    )
+    assert apres == avant
+
+
+def test_make_donut_theme_sombre_utilise_la_palette_sombre():
+    from src.figures import PALETTE_SOMBRE, make_donut
+    from src.theme import SOMBRE
+
+    lff = _make_lff(
+        [
+            {"uid": "u1", "acheteur_categorie": "A"},
+            {"uid": "u2", "acheteur_categorie": "B"},
+        ]
+    )
+
+    graph = make_donut(lff, "acheteur_categorie", per_uid=True, theme=SOMBRE)
+    piecolorway = list(graph.figure.layout.piecolorway)
+
+    assert piecolorway
+    assert set(piecolorway) <= set(PALETTE_SOMBRE)
+
+
+def test_make_donut_theme_clair_utilise_px_safe():
+    import plotly.express as px
+
+    from src.figures import make_donut
+    from src.theme import CLAIR
+
+    lff = _make_lff(
+        [
+            {"uid": "u1", "acheteur_categorie": "A"},
+            {"uid": "u2", "acheteur_categorie": "B"},
+        ]
+    )
+
+    graph = make_donut(lff, "acheteur_categorie", per_uid=True, theme=CLAIR)
+    piecolorway = list(graph.figure.layout.piecolorway)
+
+    assert piecolorway == list(px.colors.qualitative.Safe)
+
+
+def test_make_donut_sans_theme_hors_requete_reste_clair():
+    """Non-régression : sans argument theme, et hors contexte de requête
+    (comme en test), le rendu clair actuel est inchangé."""
+    import plotly.express as px
+
+    from src.figures import make_donut
+
+    lff = _make_lff([{"uid": "u1", "acheteur_categorie": "A"}])
+
+    graph = make_donut(lff, "acheteur_categorie", per_uid=True)
+
+    assert list(graph.figure.layout.piecolorway) == list(px.colors.qualitative.Safe)
+
+
+def test_get_barchart_sources_theme_sombre_utilise_palette_sombre_24():
+    from datetime import datetime
+
+    from src.figures import PALETTE_SOMBRE_24, get_barchart_sources
+    from src.theme import SOMBRE
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "dateNotification": datetime(2021, 1, 1),
+                "sourceDataset": "a",
+            },
+            {
+                "uid": "u2",
+                "dateNotification": datetime(2021, 1, 2),
+                "sourceDataset": "b",
+            },
+        ]
+    )
+
+    graph = get_barchart_sources(lff, "dateNotification", theme=SOMBRE)
+
+    couleurs = {trace.marker.color for trace in graph.figure.data}
+    assert couleurs
+    assert couleurs <= set(PALETTE_SOMBRE_24)
+
+
+def test_get_barchart_sources_sans_theme_hors_requete_reste_clair():
+    """Non-régression : rendu clair (Dark24) inchangé sans argument theme."""
+    from datetime import datetime
+
+    import plotly.express as px
+
+    from src.figures import get_barchart_sources
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "dateNotification": datetime(2021, 1, 1),
+                "sourceDataset": "a",
+            },
+        ]
+    )
+
+    graph = get_barchart_sources(lff, "dateNotification")
+
+    couleurs = {trace.marker.color for trace in graph.figure.data}
+    assert couleurs <= set(px.colors.qualitative.Dark24)
+
+
+def test_build_org_markers_theme_sombre_utilise_org_colors_sombre():
+    from src.figures import ORG_COLORS_SOMBRE, build_org_markers
+    from src.theme import SOMBRE
+
+    lff = pl.LazyFrame(
+        [
+            {
+                "uid": "u1",
+                "acheteur_longitude": 2.35,
+                "acheteur_latitude": 48.85,
+                "acheteur_nom": "ACHETEUR A",
+            },
+        ]
+    )
+
+    markers = build_org_markers(lff, "acheteur", theme=SOMBRE)
+
+    assert markers[0]["marker_color"] == ORG_COLORS_SOMBRE["acheteur"]
+
+
+def test_build_org_markers_theme_clair_utilise_org_colors():
+    """Non-régression : en clair, la couleur reste celle d'ORG_COLORS."""
+    from src.figures import ORG_COLORS, build_org_markers
+    from src.theme import CLAIR
+
+    lff = pl.LazyFrame(
+        [
+            {
+                "uid": "u1",
+                "acheteur_longitude": 2.35,
+                "acheteur_latitude": 48.85,
+                "acheteur_nom": "ACHETEUR A",
+            },
+        ]
+    )
+
+    markers = build_org_markers(lff, "acheteur", theme=CLAIR)
+
+    assert markers[0]["marker_color"] == ORG_COLORS["acheteur"]
+
+
+def test_palette_sombre_24_a_24_couleurs_distinctes():
+    from src.figures import PALETTE_SOMBRE_24
+
+    assert len(PALETTE_SOMBRE_24) == 24
+    assert len(set(PALETTE_SOMBRE_24)) == 24
+
+
+def test_get_considerations_card_content_theme_sombre_utilise_couleurs_sombres():
+    import dash_bootstrap_components as dbc
+
+    from src.figures import GRILLE_SOMBRE, get_considerations_card_content
+    from src.theme import SOMBRE
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "considerationsSociales": "Clause sociale",
+                "considerationsEnvironnementales": "Sans objet",
+            },
+            {
+                "uid": "u2",
+                "considerationsSociales": "Sans objet",
+                "considerationsEnvironnementales": "Critère environnemental",
+            },
+        ]
+    )
+
+    div = get_considerations_card_content(lff, theme=SOMBRE)
+
+    bars = [b for b in _find_components(div, dbc.Progress) if getattr(b, "bar", False)]
+    bar_ren, bar_social, bar_env = bars
+
+    assert bar_ren.color == GRILLE_SOMBRE
+    assert bar_social.color == "#d0633d"
+    assert bar_env.color == "#85c54c"
+
+
+def test_get_considerations_card_content_sans_theme_hors_requete_reste_clair():
+    """Non-régression : couleurs claires (#6c757d, #CC6677, #117733) inchangées."""
+    import dash_bootstrap_components as dbc
+
+    from src.figures import get_considerations_card_content
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "considerationsSociales": "Clause sociale",
+                "considerationsEnvironnementales": "Sans objet",
+            },
+        ]
+    )
+
+    div = get_considerations_card_content(lff)
+
+    bars = [b for b in _find_components(div, dbc.Progress) if getattr(b, "bar", False)]
+    bar_ren, bar_social, bar_env = bars
+
+    assert bar_ren.color == "#6c757d"
+    assert bar_social.color == "#CC6677"
+    assert bar_env.color == "#117733"
+
+
+def test_build_dashboard_cards_propage_le_theme_sombre_aux_figures():
+    """build_dashboard_cards résout le thème une fois et le transmet à toutes
+    les figures qu'il construit (donut de la card cat-acheteur ici)."""
+    from dash import dcc
+
+    from src.figures import FOND_SOMBRE, card_id_of
+    from src.theme import SOMBRE
+
+    build_dashboard_cards, dff = _cards_de_test()
+    cards = build_dashboard_cards(dff, theme=SOMBRE)
+
+    cat_acheteur = next(c for c in cards if card_id_of(c) == "cat-acheteur")
+    graphs = _find_components(cat_acheteur, dcc.Graph)
+
+    assert graphs
+    assert graphs[0].figure.layout.paper_bgcolor == FOND_SOMBRE
