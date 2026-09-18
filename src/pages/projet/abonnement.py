@@ -80,16 +80,16 @@ def _explainer():
             html.Ul(
                 [
                     html.Li(
-                        "passer plus de temps à développer colibre et moins de temps "
+                        "le développeur passe plus de temps à développer colibre et moins de temps "
                         "à chercher des missions"
                     ),
                     html.Li(
-                        "rédaction d'études à partir des données, par exemple sur les "
+                        "il peut rédiger des études à partir des données, par exemple sur les "
                         "acheteurs dont les données sont introuvables et les raisons "
                         "de cette non-publication."
                     ),
                     html.Li(
-                        "militer aux côtés des bonnes volontés pour une "
+                        "il peut militer aux côtés des bonnes volontés pour une "
                         "législation plus ambitieuse sur la transparence de la "
                         "commande publique."
                     ),

@@ -1,7 +1,7 @@
 [project]
 name = "colibre"
 description = "Interface d'exploration et d'analyse des marchés publics français."
-version = "3.1.0"
+version = "3.2.0"
 requires-python = ">= 3.10"
 authors = [{ name = "Colin Maudry", email = "colin@colmo.tech" }]
 dependencies = [

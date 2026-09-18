@@ -85,6 +85,7 @@ Conformément au RGPD, colibre ne recueille que les données strictement nécess
 **Données stockées par Colmo pour l'administration de colibre :**
 
 - Adresse e-mail (identification du compte)
+- Le mot de passe est [haché](https://fr.wikipedia.org/wiki/Fonction_de_hachage_cryptographique#V%C3%A9rification_de_mot_de_passe), donc connu seulement de l'abonné•e
 - Numéro SIRET (optionnel, si renseigné, conservé pour pré-remplir les futures souscriptions)
 
 **Conversations en direct depuis le site Web 💬**
