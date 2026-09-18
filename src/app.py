@@ -35,6 +35,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.admin.guard import is_admin
 from src.auth.setup import init_auth
+from src.theme import SOMBRE, current_theme
 from src.utils import DEVELOPMENT
 from src.utils.cache import (
     cache,
@@ -481,7 +482,14 @@ def _interpolate_index_per_request(**kwargs):
         if identity:
             kwargs["scripts"] = f"{kwargs.get('scripts', '')}\n        {identity}"
 
-    return _default_interpolate_index(**kwargs)
+    html_page = _default_interpolate_index(**kwargs)
+    # Thème posé côté serveur : pas de flash clair avant le chargement du JS.
+    # Bootstrap 5.3 bascule ses composants sur cet attribut (#118).
+    if current_theme() == SOMBRE:
+        html_page = html_page.replace(
+            '<html lang="fr">', '<html lang="fr" data-bs-theme="dark">', 1
+        )
+    return html_page
 
 
 app.interpolate_index = _interpolate_index_per_request

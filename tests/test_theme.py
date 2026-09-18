@@ -114,3 +114,25 @@ def test_current_theme_connecte_abonne_sans_preference_est_clair(monkeypatch):
 
     with app.server.test_request_context("/"):
         assert theme.current_theme() == theme.CLAIR
+
+
+def test_index_html_theme_sombre_pose_data_bs_theme(monkeypatch):
+    from src import app as app_module
+
+    monkeypatch.setattr(app_module, "current_theme", lambda: app_module.SOMBRE)
+
+    html_page = app_module.app.server.test_client().get("/").get_data(as_text=True)
+
+    assert '<html lang="fr" data-bs-theme="dark">' in html_page
+
+
+def test_index_html_theme_clair_ne_pose_pas_data_bs_theme(monkeypatch):
+    from src import app as app_module
+    from src.theme import CLAIR
+
+    monkeypatch.setattr(app_module, "current_theme", lambda: CLAIR)
+
+    html_page = app_module.app.server.test_client().get("/").get_data(as_text=True)
+
+    assert '<html lang="fr">' in html_page
+    assert "data-bs-theme" not in html_page
