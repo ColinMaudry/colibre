@@ -1423,6 +1423,29 @@ input[type="number"] {
   background-color: var(--earth-bg-2) !important;
 }
 
+/* Bouton PRIMARY plein (#118 fix round 1) : le gradient de style.css:76-89 est
+   en rgb() littéraux (rgb(209,96,73) / rgb(179,56,33) / rgb(159,36,22)), donc
+   il n'est pas mis à jour par var(--btn-terracotta) et reste le gradient du
+   mode clair même sous data-bs-theme="dark". Combiné à
+   --btn-terracotta-text: #121418 (posé plus haut dans ce bloc), le texte
+   devenait presque noir sur un fond rouge-brun sombre : contraste mesuré
+   2.40–3.08:1, sous le seuil AA de 4.5:1. Gradient de remplacement dérivé de
+   --earth-primary (#e06c57), chaque palier vérifié ≥ 4.5:1 avec #121418 :
+   base top #e47e6b 6.58:1, mid #e06c57 5.66:1, bottom #ca614e 4.68:1 ;
+   survol (plus clair) top #e89181 7.72:1, mid #e47e6b 6.58:1,
+   bottom #e16f5a 5.81:1. */
+[data-bs-theme="dark"] button.btn.btn-primary,
+[data-bs-theme="dark"] a.btn.btn-primary,
+[data-bs-theme="dark"] button.show-hide {
+  background-image: linear-gradient(#e47e6b, var(--earth-primary) 26%, #ca614e);
+}
+
+[data-bs-theme="dark"] button.btn.btn-primary:hover,
+[data-bs-theme="dark"] a.btn.btn-primary:hover,
+[data-bs-theme="dark"] button.show-hide:hover {
+  background-image: linear-gradient(#e89181, #e47e6b 26%, #e16f5a);
+}
+
 [data-bs-theme="dark"] a {
   color: var(--earth-link);
 }
