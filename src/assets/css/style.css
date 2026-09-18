@@ -70,6 +70,7 @@ h3 {
   --btn-secondary-hover-bg: #f1f3f5;
   --btn-danger: #c0392b;
   --btn-danger-text: #fff;
+  --btn-danger-hover: #a93226;
 }
 
 /* Base commune : rayon + typo */
@@ -168,8 +169,17 @@ a.btn.btn-primary:active {
 .btn.btn-danger:hover,
 .btn.btn-danger:focus-visible {
   color: var(--btn-danger-text);
-  background-color: #a93226;
-  border-color: #a93226;
+  background-color: var(--btn-danger-hover);
+  border-color: var(--btn-danger-hover);
+}
+
+/* Parité avec le bouton primaire (:active dédié plus haut) : au cas où le
+   bouton a un frère précédent (ex. groupe Annuler/Supprimer d'une modale),
+   `:not(.btn-check) + .btn:active` de Bootstrap pourrait sinon s'appliquer. */
+.btn.btn-danger:active {
+  color: var(--btn-danger-text);
+  background-color: var(--btn-danger-hover);
+  border-color: var(--btn-danger-hover);
 }
 
 /* --- État désactivé commun (conserve l'existant) --- */
@@ -1371,6 +1381,11 @@ input[type="number"] {
      bascule aussi en texte foncé (~6.3:1) pour le bouton danger plein. */
   --btn-danger: #ff645a;
   --btn-danger-text: #121418;
+  /* #a93226 (survol clair) ne tient qu'≈2.8:1 avec le texte foncé du danger
+     sombre ; #ff8078 (même famille rouge Earthsong, éclairci comme
+     --btn-terracotta-hover l'est par rapport à --earth-primary) remonte le
+     survol/actif à ~7.6:1. */
+  --btn-danger-hover: #ff8078;
 
   /* AG Grid */
   --ag-background-color: var(--earth-bg);
