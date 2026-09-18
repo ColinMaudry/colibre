@@ -34,6 +34,7 @@ from src.pages._compte_shell import current_user_has_subscription
 from src.saved_views import db as saved_views_db
 from src.saved_views import resolve as saved_views_resolve
 from src.saved_views import ui as saved_views_ui
+from src.theme import current_theme
 from src.utils import get_data_update_timestamp, logger
 from src.utils.cache import cache
 from src.utils.grid import apply_persisted_layout, fetch_grid_page, grid_column_defs
@@ -1011,7 +1012,7 @@ def _normalize_filter_model(filter_model: dict | None) -> str:
 
 
 @cache.memoize()
-def _cards_pour_filtre(filter_model_json: str):
+def _cards_pour_filtre(filter_model_json: str, theme: str):
     """Cards de l'observatoire pour le filtre courant de la grille.
 
     Mémoïsé sur le filterModel normalisé : basculer d'avant en arrière sur le
@@ -1019,13 +1020,16 @@ def _cards_pour_filtre(filter_model_json: str):
     grille sont ignorées — les cards ont besoin de colonnes que l'utilisateur
     n'affiche pas forcément (cf. issue #137) — et les tris aussi, ils
     n'influent sur aucune agrégation.
+
+    `theme` fait partie de la clé de cache : les figures sont colorées côté
+    serveur (#118).
     """
     ast = filtermodel_to_ast(json.loads(filter_model_json), schema)
     where_sql, params = ast_to_sql(ast, schema)
     dff = query_marches(
         where_sql=where_sql, params=params, columns=observatoire_cards_columns()
     )
-    return build_dashboard_cards(dff)
+    return build_dashboard_cards(dff, theme=theme)
 
 
 @callback(
@@ -1060,7 +1064,7 @@ def update_mode_observatoire_cards(mode_actif, filter_model, card_order):
         )
 
     track_search(json.dumps(filter_model), "tab observatoire")
-    cards = _cards_pour_filtre(_normalize_filter_model(filter_model))
+    cards = _cards_pour_filtre(_normalize_filter_model(filter_model), current_theme())
 
     # Après le cache mémoïsé de _cards_pour_filtre, jamais dedans : l'ordre
     # ferait exploser la cardinalité des entrées (#107).

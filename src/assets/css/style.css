@@ -15,6 +15,13 @@
 
   /* Override AG Grid */
   --ag-font-family: var(--main-font);
+
+  /* Frise des étapes (etapes.py) */
+  --etape-approch: #7c5cff;
+  --etape-jal: #f79009;
+  --etape-boamp: #1570ef;
+  --etape-joue: #0e9384;
+  --etape-decp: #12b76a;
 }
 
 /* ==========================================================================
@@ -1381,6 +1388,13 @@ input[type="number"] {
   --Dash-Text-Disabled: var(--earth-muted);
   --Dash-Tooltip-Background-Color: var(--earth-bg-2);
   --Dash-Tooltip-Border-Color: var(--earth-border);
+
+  /* Frise des étapes (etapes.py) */
+  --etape-approch: #d0633d;
+  --etape-jal: #f5ae2e;
+  --etape-boamp: #1398b9;
+  --etape-joue: #509552;
+  --etape-decp: #85c54c;
 }
 
 [data-bs-theme="dark"] body {

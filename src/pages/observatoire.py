@@ -29,6 +29,7 @@ from src.figures import (
 )
 from src.observatoire_order import get_card_order, save_card_order
 from src.pages._compte_shell import current_user_has_subscription
+from src.theme import current_theme
 from src.utils import logger
 from src.utils.cache import cache
 from src.utils.data import (
@@ -664,14 +665,16 @@ def _normalize_filter_params(filter_params: dict) -> tuple:
 
 
 @cache.memoize()
-def _compute_dashboard_children(filter_params_normalized: tuple):
+def _compute_dashboard_children(filter_params_normalized: tuple, theme: str):
+    # `theme` fait partie de la clé de cache : les figures sont colorées
+    # côté serveur (#118).
     logger.debug("Cache miss — computing dashboard")
     filter_params = {
         k: (list(v) if isinstance(v, tuple) else v) for k, v in filter_params_normalized
     }
 
     dff = prepare_dashboard_data(columns=observatoire_cards_columns(), **filter_params)
-    return build_dashboard_cards(dff)
+    return build_dashboard_cards(dff, theme=theme)
 
 
 @callback(
@@ -688,7 +691,7 @@ def update_dashboard_cards(card_order, *filter_values):
         filter_params[input_id] = value
 
     filter_params_normalized = _normalize_filter_params(filter_params)
-    children = _compute_dashboard_children(filter_params_normalized)
+    children = _compute_dashboard_children(filter_params_normalized, current_theme())
 
     # L'ordre est appliqué APRÈS le cache mémoïsé : le mettre dans
     # _compute_dashboard_children multiplierait les entrées de cache par le
