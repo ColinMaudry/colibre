@@ -627,10 +627,11 @@ def _auth_nav(_, pathname=None):
                     "display": "flex",
                     "flexDirection": "column",
                     "justifyContent": "center",
-                    "lineHeight": "1.1",
+                    "lineHeight": "1.2",
                     "height": "100%",
                     "paddingTop": "10px",
                     "paddingBottom": "10px",
+                    "paddingLeft": "12px",
                 },
             )
         )
@@ -646,7 +647,7 @@ def _auth_nav(_, pathname=None):
         for section in visible_sections(current_user_has_subscription())
     ]
     return dbc.DropdownMenu(
-        label="Espace abonné",
+        label="Mon compte",
         nav=True,
         in_navbar=True,
         # Le menu est en bout de navbar (`ms-auto`) : aligné à gauche, il
