@@ -972,10 +972,18 @@ CONSIDERATIONS_RENSEIGNEES = [
 ]
 
 
-def _progress_bar(pct: int, color: str) -> dbc.Progress:
+def _progress_bar(pct: int, color: str, theme: str | None = None) -> dbc.Progress:
+    # Le blanc du label ne tient pas sur les barres claires de la palette
+    # Earthsong (ex. #85c54c, environnement, ≈2.1:1) ; en sombre on bascule
+    # sur le même texte foncé que le bouton primaire (--btn-terracotta-text).
+    label_color = "#121418" if _theme(theme) == SOMBRE else "white"
     return dbc.Progress(
         dbc.Progress(
-            value=pct, label=f"{pct} %", bar=True, color=color, style={"color": "white"}
+            value=pct,
+            label=f"{pct} %",
+            bar=True,
+            color=color,
+            style={"color": label_color},
         ),
     )
 
@@ -1003,7 +1011,7 @@ def get_considerations_card_content(
                         ),
                     ],
                 ),
-                _progress_bar(pct_ren, couleur_neutre),
+                _progress_bar(pct_ren, couleur_neutre, theme),
             ],
         )
     ]
@@ -1025,7 +1033,7 @@ def get_considerations_card_content(
                             ),
                         ],
                     ),
-                    _progress_bar(pct, color),
+                    _progress_bar(pct, color, theme),
                 ],
             )
         )

@@ -927,6 +927,57 @@ def test_get_considerations_card_content_sans_theme_hors_requete_reste_clair():
     assert bar_env.color == "#117733"
 
 
+def test_get_considerations_card_content_theme_sombre_texte_label_fonce():
+    """Le blanc du label (#118 finding 7) est illisible sur une barre claire
+    de la palette Earthsong (ex. #85c54c, environnement, ≈2.1:1) : en sombre,
+    le label passe en texte foncé (#121418, comme le bouton primaire)."""
+    import dash_bootstrap_components as dbc
+
+    from src.figures import get_considerations_card_content
+    from src.theme import SOMBRE
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "considerationsSociales": "Clause sociale",
+                "considerationsEnvironnementales": "Sans objet",
+            },
+        ]
+    )
+
+    div = get_considerations_card_content(lff, theme=SOMBRE)
+
+    bars = [b for b in _find_components(div, dbc.Progress) if getattr(b, "bar", False)]
+    assert bars, "aucune barre trouvée"
+    for bar in bars:
+        assert bar.style["color"] == "#121418"
+
+
+def test_get_considerations_card_content_theme_clair_texte_label_blanc_inchange():
+    """Non-régression : le label reste blanc en thème clair (octet identique)."""
+    import dash_bootstrap_components as dbc
+
+    from src.figures import get_considerations_card_content
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "considerationsSociales": "Clause sociale",
+                "considerationsEnvironnementales": "Sans objet",
+            },
+        ]
+    )
+
+    div = get_considerations_card_content(lff)
+
+    bars = [b for b in _find_components(div, dbc.Progress) if getattr(b, "bar", False)]
+    assert bars, "aucune barre trouvée"
+    for bar in bars:
+        assert bar.style["color"] == "white"
+
+
 def test_build_dashboard_cards_propage_le_theme_sombre_aux_figures():
     """build_dashboard_cards résout le thème une fois et le transmet à toutes
     les figures qu'il construit (donut de la card cat-acheteur ici)."""
