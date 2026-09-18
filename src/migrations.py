@@ -93,6 +93,13 @@ _MIGRATIONS: list[tuple[str, str]] = [
         "card_order TEXT NOT NULL, "
         "updated_at TEXT NOT NULL)",
     ),
+    (
+        "0016_create_user_preferences",
+        "CREATE TABLE IF NOT EXISTS user_preferences ("
+        "user_id INTEGER PRIMARY KEY, "
+        "theme TEXT NOT NULL DEFAULT 'clair', "
+        "updated_at TEXT NOT NULL)",
+    ),
 ]
 
 
