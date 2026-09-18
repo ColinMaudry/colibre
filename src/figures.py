@@ -546,7 +546,7 @@ def make_clusters_map(region: dict) -> html.Div:
     region_id = name.lower().replace(" ", "-")
     leaflet_map = dl.Map(
         [
-            dl.TileLayer(),
+            dl.TileLayer(className="tuiles"),
             dl.GeoJSON(
                 data=titulaires_geojson_data,
                 cluster=True,
@@ -681,7 +681,7 @@ def get_org_location_map(
     point_to_layer = ns("pointToLayer")
     cluster_to_layer = ns("clusterToLayer")
 
-    layers: list = [dl.TileLayer()]
+    layers: list = [dl.TileLayer(className="tuiles")]
     all_points: list[tuple[float, float]] = []
     # Ordre fixe (titulaire puis acheteur), comme sur /observatoire. Le point
     # de l'organisme consulté (is_home) est de toute façon toujours ramené au

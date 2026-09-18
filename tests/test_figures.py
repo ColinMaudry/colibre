@@ -325,6 +325,40 @@ def test_get_org_location_map_defaults_to_france_view_without_coordinates():
     assert leaflet_map.zoom == 5
 
 
+def test_get_org_location_map_tile_layer_has_tuiles_classname():
+    """La couche de tuiles OSM porte className="tuiles" : c'est ce sélecteur
+    que le bloc CSS mode sombre (#118) cible pour l'assombrir (filter)."""
+    import dash_leaflet as dl
+
+    from src.figures import get_org_location_map
+
+    leaflet_map = get_org_location_map(_org_map_dff(), "acheteur", "test-map")
+
+    tile_layers = [c for c in leaflet_map.children if isinstance(c, dl.TileLayer)]
+    assert len(tile_layers) == 1
+    assert tile_layers[0].className == "tuiles"
+
+
+def test_make_clusters_map_tile_layer_has_tuiles_classname():
+    import dash_leaflet as dl
+
+    from src.figures import make_clusters_map
+
+    region = {
+        "name": "Hexagone",
+        "data": ([], []),
+        "coordinates": [46.6, 2.2],
+        "zoom_leaflet": 5,
+    }
+
+    div = make_clusters_map(region)
+
+    leaflet_map = next(c for c in div.children if isinstance(c, dl.Map))
+    tile_layers = [c for c in leaflet_map.children if isinstance(c, dl.TileLayer)]
+    assert len(tile_layers) == 1
+    assert tile_layers[0].className == "tuiles"
+
+
 def test_bounds_to_center_zoom_single_point_uses_max_zoom():
     from src.figures import bounds_to_center_zoom
 

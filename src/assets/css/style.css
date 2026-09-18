@@ -1342,3 +1342,331 @@ input[type="number"] {
 .theme-switch .form-check-input {
   cursor: pointer;
 }
+
+/* ==========================================================================
+   Mode sombre (#118) — palette Earthsong
+   Posé côté serveur sur <html data-bs-theme="dark"> pour les abonné·es.
+   ========================================================================== */
+[data-bs-theme="dark"] {
+  --earth-bg: #292520;
+  --earth-bg-2: #332e28;
+  --earth-bg-3: #3d372f;
+  --earth-fg: #e5c7a9;
+  --earth-muted: #968c83;
+  --earth-border: #675f54;
+  --earth-primary: #e06c57;
+  --earth-link: #eb8c82;
+
+  --bs-body-bg: var(--earth-bg);
+  --bs-body-bg-rgb: 41, 37, 32;
+  --bs-body-color: var(--earth-fg);
+  --bs-body-color-rgb: 229, 199, 169;
+  --bs-emphasis-color: #f6f7ec;
+  --bs-secondary-color: var(--earth-muted);
+  --bs-secondary-bg: var(--earth-bg-2);
+  --bs-tertiary-bg: var(--earth-bg-3);
+  --bs-border-color: var(--earth-border);
+  --bs-link-color: var(--earth-link);
+  --bs-link-color-rgb: 235, 140, 130;
+  --bs-link-hover-color: #f6f7ec;
+  --bs-primary: var(--earth-primary);
+  --bs-primary-rgb: 224, 108, 87;
+
+  --primary-color: var(--earth-primary);
+  --primary-color-text: var(--earth-primary);
+  --btn-terracotta: var(--earth-primary);
+  --btn-terracotta-text: #121418;
+  --btn-secondary-text: var(--earth-fg);
+  --btn-secondary-border: var(--earth-border);
+  --btn-secondary-hover-bg: var(--earth-bg-3);
+
+  /* AG Grid */
+  --ag-background-color: var(--earth-bg);
+  --ag-foreground-color: var(--earth-fg);
+  --ag-header-background-color: var(--earth-bg-2);
+  --ag-header-foreground-color: var(--earth-fg);
+  --ag-odd-row-background-color: var(--earth-bg-2);
+  --ag-row-hover-color: var(--earth-bg-3);
+  --ag-border-color: var(--earth-border);
+  --ag-secondary-foreground-color: var(--earth-muted);
+
+  /* Composants dcc (Dash 4) : variables --Dash-Fill-*, --Dash-Text-*,
+     --Dash-Stroke-* de fond, texte et bordure, recensées par un grep
+     récursif du dossier dash/dcc/ du venv (voir rapport de tâche).
+     --Dash-Fill-Interactive-Strong n'est pas redéfinie ici : elle
+     vaut déjà var(--primary-color) (:root plus haut dans ce fichier), qui
+     est lui-même surchargé ci-dessus en var(--earth-primary), donc la
+     cascade la met à jour automatiquement. --Dash-Fill-Inverse-Strong
+     (icône blanche sur fond Interactive-Strong) et --Dash-Shading-* (teinte
+     d'ombre) sont laissées telles quelles : ni fond/texte/bordure de
+     composant, ni assez contrastées pour justifier un cas particulier ici. */
+  --Dash-Fill-Disabled: var(--earth-bg-3);
+  --Dash-Fill-Interactive-Weak: var(--earth-bg-2);
+  --Dash-Fill-Primary-Hover: var(--earth-bg-2);
+  --Dash-Fill-Primary-Active: var(--earth-bg-3);
+  --Dash-Stroke-Strong: var(--earth-border);
+  --Dash-Stroke-Weak: var(--earth-border);
+  --Dash-Text-Primary: var(--earth-fg);
+  --Dash-Text-Strong: var(--earth-fg);
+  --Dash-Text-Weak: var(--earth-muted);
+  --Dash-Text-Disabled: var(--earth-muted);
+  --Dash-Tooltip-Background-Color: var(--earth-bg-2);
+  --Dash-Tooltip-Border-Color: var(--earth-border);
+}
+
+[data-bs-theme="dark"] body {
+  background-color: var(--earth-bg);
+  color: var(--earth-fg);
+}
+
+[data-bs-theme="dark"] .navbar {
+  background-color: var(--earth-bg-2) !important;
+}
+
+[data-bs-theme="dark"] a {
+  color: var(--earth-link);
+}
+
+/* Alertes : fond sombre teinté, bordure et titre à la couleur Earthsong */
+[data-bs-theme="dark"] .alert-warning {
+  --bs-alert-bg: #3a2f1c;
+  --bs-alert-border-color: #f5ae2e;
+  --bs-alert-color: #f6e3bf;
+  --bs-alert-link-color: #f5ae2e;
+}
+[data-bs-theme="dark"] .alert-info {
+  --bs-alert-bg: #1b2e33;
+  --bs-alert-border-color: #1398b9;
+  --bs-alert-color: #cde9f0;
+  --bs-alert-link-color: #5fdaff;
+}
+[data-bs-theme="dark"] .alert-danger {
+  --bs-alert-bg: #3a211d;
+  --bs-alert-border-color: #c94234;
+  --bs-alert-color: #f3cfc8;
+  --bs-alert-link-color: #ff645a;
+}
+
+/* Tuiles OSM assombries ; marqueurs et popups non filtrés */
+[data-bs-theme="dark"] .tuiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) sepia(0.25);
+}
+[data-bs-theme="dark"] .leaflet-container {
+  background: var(--earth-bg);
+}
+
+/* --- Inventaire (Step 4) : couleurs en dur du reste de style.css --- */
+
+/* Boutons désactivés (gris clair illisible sur fond sombre) */
+[data-bs-theme="dark"] .btn[disabled],
+[data-bs-theme="dark"] button[disabled] {
+  border-color: var(--earth-border);
+  color: var(--earth-muted);
+}
+
+/* Bordure des champs texte/nombre du tableau de bord */
+[data-bs-theme="dark"] #filters input[type="text"],
+[data-bs-theme="dark"] #filters input[type="number"] {
+  border-color: var(--earth-border);
+}
+
+/* Info de comptage sous la barre d'outils du tableau + rappel terracotta du
+   téléchargement bloqué */
+[data-bs-theme="dark"] .table-meta {
+  color: var(--earth-muted);
+}
+[data-bs-theme="dark"] .table-meta .dl-hint {
+  color: var(--earth-primary);
+}
+
+/* Bordure blanche des cellules (se fondait dans le fond clair d'origine) */
+[data-bs-theme="dark"] table.cell-table,
+[data-bs-theme="dark"] table.cell-table tr {
+  border-color: var(--earth-bg-2);
+}
+
+/* Survol / sélection du menu déroulant (react-select et dbc.DropdownMenu) */
+[data-bs-theme="dark"] .dropdown-menu {
+  --bs-dropdown-link-hover-bg: var(--earth-bg-3);
+  --bs-dropdown-link-active-bg: var(--earth-bg-3);
+}
+
+/* Survol du lien de compte actif (rosé clair -> fond sombre) */
+[data-bs-theme="dark"] .account-nav .nav-link:hover {
+  background-color: var(--earth-bg-3);
+}
+
+/* Lien actif de la nav compte : couleur de marque -> Earthsong */
+[data-bs-theme="dark"] .account-nav .nav-link.active {
+  color: var(--earth-primary);
+  border-left-color: var(--earth-primary);
+}
+
+/* En-tête de colonne des tableaux Dash (fond + bordure terracotta) */
+[data-bs-theme="dark"]
+  .dash-table-container
+  .dash-spreadsheet-container
+  .dash-spreadsheet-inner
+  th.dash-header,
+[data-bs-theme="dark"]
+  .dash-table-container
+  .dash-spreadsheet-container
+  .dash-spreadsheet-inner
+  th.dash-select-header {
+  color: var(--btn-terracotta-text);
+  background-color: var(--earth-primary);
+  border-color: var(--earth-primary) !important;
+}
+
+/* Champ de filtre des tableaux Dash */
+[data-bs-theme="dark"]
+  .dash-table-container
+  .dash-spreadsheet-container
+  .dash-spreadsheet-inner
+  .cell-table
+  .dash-filter
+  input[type="text"] {
+  border-color: var(--earth-border);
+  background-color: var(--earth-bg-2);
+  color: var(--earth-fg);
+  caret-color: var(--earth-fg);
+}
+[data-bs-theme="dark"]
+  .dash-table-container
+  .dash-spreadsheet-container
+  .dash-spreadsheet-inner
+  .cell-table
+  .dash-filter
+  input[type="text"]::placeholder {
+  color: var(--earth-muted);
+}
+[data-bs-theme="dark"]
+  .dash-table-container
+  .dash-spreadsheet-container
+  .dash-spreadsheet-inner
+  .cell-table
+  th.dash-filter {
+  background-color: var(--earth-bg-3);
+}
+
+/* Ligne paire du tableau des marchés (rosé clair) */
+[data-bs-theme="dark"] .marches_table .cell-table tr:nth-child(even) td {
+  background-color: var(--earth-bg-2);
+}
+
+/* Barre de défilement horizontale collée du tableau + son curseur */
+[data-bs-theme="dark"] .marches_table .dt-hscroll {
+  background-color: var(--earth-bg-3);
+}
+[data-bs-theme="dark"] .marches_table .dt-hscroll-thumb {
+  background-color: var(--earth-primary);
+}
+
+/* Infobulles AG Grid (rose clair par défaut) */
+[data-bs-theme="dark"] .ag-tooltip,
+[data-bs-theme="dark"] .ag-tooltip-custom {
+  background-color: var(--earth-bg-3);
+  color: var(--earth-fg);
+}
+
+/* Placeholder du Select (react-select) */
+[data-bs-theme="dark"] .Select-placeholder {
+  color: var(--earth-muted) !important;
+}
+
+/* Tooltips Dash (DataTable) */
+[data-bs-theme="dark"] .dash-tooltip,
+[data-bs-theme="dark"] .dash-table-tooltip {
+  color: var(--earth-fg);
+}
+
+/* Bordure verticale de la table des matières /a-propos + son fond */
+[data-bs-theme="dark"] .a-propos-toc {
+  border-left-color: var(--earth-border);
+  background-color: var(--earth-bg);
+}
+[data-bs-theme="dark"] .toc-link {
+  color: var(--earth-muted);
+}
+[data-bs-theme="dark"] .toc-link:hover,
+[data-bs-theme="dark"] .toc-active {
+  color: var(--earth-fg);
+}
+[data-bs-theme="dark"] .toc-header {
+  color: var(--earth-fg);
+}
+
+/* Graphique /etapes (fond, bordures et texte figés en clair) */
+[data-bs-theme="dark"] .etapes-chart {
+  background: var(--earth-bg-2);
+  border-color: var(--earth-border);
+}
+[data-bs-theme="dark"] .etapes-corner,
+[data-bs-theme="dark"] .etapes-xhead {
+  border-bottom-color: var(--earth-border);
+}
+[data-bs-theme="dark"] .etapes-xcell {
+  color: var(--earth-muted);
+  border-left-color: var(--earth-border);
+}
+[data-bs-theme="dark"] .etapes-xcell strong,
+[data-bs-theme="dark"] .etapes-stage,
+[data-bs-theme="dark"] .etapes-m-stage,
+[data-bs-theme="dark"] .etapes-m-label {
+  color: var(--earth-fg);
+}
+[data-bs-theme="dark"] .etapes-stage small {
+  color: var(--earth-muted);
+}
+[data-bs-theme="dark"] .etapes-stage {
+  border-bottom-color: var(--earth-bg-3);
+}
+[data-bs-theme="dark"] .etapes-lane {
+  border-bottom-color: var(--earth-bg-3);
+}
+[data-bs-theme="dark"] .etapes-segs > div {
+  border-left-color: var(--earth-bg-3);
+}
+[data-bs-theme="dark"] .etapes-empty,
+[data-bs-theme="dark"] .etapes-note,
+[data-bs-theme="dark"] .etapes-m-seuil,
+[data-bs-theme="dark"] .etapes-m-empty {
+  color: var(--earth-muted);
+}
+[data-bs-theme="dark"] .etapes-m-block {
+  border-color: var(--earth-border);
+}
+[data-bs-theme="dark"] .etapes-m-header {
+  background: var(--earth-bg-3);
+  border-bottom-color: var(--earth-bg);
+}
+[data-bs-theme="dark"] .etapes-m-item {
+  border-bottom-color: var(--earth-bg-3);
+}
+[data-bs-theme="dark"] .etapes-m-link {
+  color: var(--earth-link);
+}
+[data-bs-theme="dark"] .etapes-detail {
+  background: var(--earth-bg-2);
+  border-color: var(--earth-border);
+}
+
+/* Écran de chargement initial (avant hydratation de l'app Dash) : la classe
+   est posée sur <body>, avant que le thème serveur ait pu s'appliquer aux
+   composants Dash, mais data-bs-theme est déjà sur <html>. */
+[data-bs-theme="dark"] ._dash-loading::after {
+  color: var(--earth-muted);
+}
+
+/* Légende superposée des cartes à clusters (fond blanc translucide) */
+[data-bs-theme="dark"] .map-legend {
+  background-color: rgba(41, 37, 32, 0.75);
+  border-color: var(--earth-border);
+}
+
+/* Surlignage temporaire de la ligne ciblée par une ancre /projet/donnees :
+   le rgba(179,56,33,.18) d'origine (teinte claire) devient quasi invisible
+   sur fond sombre ; on reprend la même opacité avec le rouge Earthsong. */
+[data-bs-theme="dark"] .ag-row.champ-cible {
+  background-color: rgba(224, 108, 87, 0.28);
+}
