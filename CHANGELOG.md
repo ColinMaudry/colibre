@@ -1,4 +1,9 @@
-##### 3.1.0
+#### 3.2.0
+
+- Possiblité de réordonner les tuiles de l'observatoire (réservé aux abonné·es) ([#107](https://github.com/colinmaudry/colibre/issues/107))
+- Amélioration de la visibilité des abonnements
+
+#### 3.1.0
 
 - Dans le Tableau, un bouton permet d'afficher les données filtrées du tableau soit sous forme de lignes (mode actuel, par défaut), soit sous forme de visualisations de données (réservé aux abonné·es) ([#137](https://github.com/colinmaudry/colibre/issues/137))
 - Sauvegarde automatique de la base de données des utilisateurs et utilisatrices

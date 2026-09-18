@@ -17,8 +17,10 @@ register_page(
 )
 
 abonnement_features = dcc.Markdown("""
-    - sauvegardez et partagez des **vues** dans la page Tableau
+    - sauvegardez et partagez des **vues** (ensemble de filtres, de tris et de colonnes) dans la page Tableau
     - interrogez les données depuis un agent IA via le **connecteur MCP** (ChatGPT, Claude, Mistral...)
+    - personnalisez l'ordre d'affichage des tuiles de l'**Observatoire**
+    - projetez les données filtrées de la page Tableau dans les visualisations de l'Observatoire
     - votez pour les fonctionnalités à développer en priorité dans la **roadmap**
     - participez à la pérennité du projet
       """)

@@ -58,7 +58,7 @@ def test_mode_inactif_masque_les_cards_sans_les_recalculer(tableau_abonne):
     from dash import no_update
 
     children, classe = tableau_abonne.update_mode_observatoire_cards(
-        False, FILTRE_ACHETEUR
+        False, FILTRE_ACHETEUR, None
     )
 
     # Les cards restent montées : repasser en mode observatoire ne relance
@@ -68,7 +68,7 @@ def test_mode_inactif_masque_les_cards_sans_les_recalculer(tableau_abonne):
 
 
 def test_sans_filtre_le_mode_invite_a_en_appliquer_un(tableau_abonne):
-    children, classe = tableau_abonne.update_mode_observatoire_cards(True, None)
+    children, classe = tableau_abonne.update_mode_observatoire_cards(True, None, None)
 
     assert "Appliquez au moins un filtre" in str(children)
     assert "d-none" not in classe
@@ -76,7 +76,7 @@ def test_sans_filtre_le_mode_invite_a_en_appliquer_un(tableau_abonne):
 
 def test_avec_un_filtre_les_cards_de_lobservatoire_sont_affichees(tableau_abonne):
     children, classe = tableau_abonne.update_mode_observatoire_cards(
-        True, FILTRE_ACHETEUR
+        True, FILTRE_ACHETEUR, None
     )
 
     assert "d-none" not in classe
@@ -96,8 +96,8 @@ def test_le_filtre_de_la_grille_restreint_bien_les_cards(tableau_abonne):
         }
     }
 
-    avec, _ = tableau_abonne.update_mode_observatoire_cards(True, FILTRE_ACHETEUR)
-    sans, _ = tableau_abonne.update_mode_observatoire_cards(True, aucun_resultat)
+    avec, _ = tableau_abonne.update_mode_observatoire_cards(True, FILTRE_ACHETEUR, None)
+    sans, _ = tableau_abonne.update_mode_observatoire_cards(True, aucun_resultat, None)
 
     assert str(avec) != str(sans)
 
@@ -108,7 +108,9 @@ def test_le_mode_est_refuse_sans_abonnement(monkeypatch):
 
     monkeypatch.setattr(tableau, "current_user_has_subscription", lambda: False)
 
-    children, _classe = tableau.update_mode_observatoire_cards(True, FILTRE_ACHETEUR)
+    children, _classe = tableau.update_mode_observatoire_cards(
+        True, FILTRE_ACHETEUR, None
+    )
 
     assert "Résumé" not in str(children)
     assert "abonnant" in str(children)

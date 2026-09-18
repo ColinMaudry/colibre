@@ -1314,3 +1314,26 @@ input[type="number"] {
     animation: mode-observatoire-apparition 0.25s ease-out;
   }
 }
+
+/* --- Drag & drop des cards de l'observatoire (#107) --- */
+
+/* La classe n'est posée par observatoire-dragdrop.js que sur les écrans et
+   pointeurs qui supportent le drag : rien à neutraliser en tactile. */
+.observatoire-card-draggable {
+  cursor: grab;
+}
+
+.observatoire-card-draggable:active {
+  cursor: grabbing;
+}
+
+.observatoire-card-draggable.dragging {
+  opacity: 0.4;
+}
+
+/* Bordure interne : un `border` sur la colonne Bootstrap décalerait la
+   grille d'un cran pendant le survol. */
+.observatoire-card-draggable.drag-over > .card {
+  outline: 2px dashed var(--bs-primary, #007bff);
+  outline-offset: -2px;
+}

@@ -86,6 +86,13 @@ _MIGRATIONS: list[tuple[str, str]] = [
         "0014_add_trial_ends_at_to_subscriber_state",
         "ALTER TABLE subscriber_state ADD COLUMN trial_ends_at TEXT",
     ),
+    (
+        "0015_create_observatoire_card_order",
+        "CREATE TABLE IF NOT EXISTS observatoire_card_order ("
+        "user_id INTEGER PRIMARY KEY, "
+        "card_order TEXT NOT NULL, "
+        "updated_at TEXT NOT NULL)",
+    ),
 ]
 
 

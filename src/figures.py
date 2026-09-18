@@ -487,7 +487,9 @@ def get_geographic_maps(dff: pl.DataFrame) -> list[dbc.Col] | list:
 
         lg, xl = (12, 8) if code == "Hexagone" else (6, 4)
 
-        col = make_card(regions[code]["name"], fig=map_graph, lg=lg, xl=xl)
+        col = make_card(
+            regions[code]["name"], fig=map_graph, lg=lg, xl=xl, card_id=f"carte-{code}"
+        )
         cols.append(col)
 
     return cols
@@ -928,9 +930,43 @@ def get_considerations_card_content(lff: pl.LazyFrame) -> html.Div:
     return html.Div(children=blocks)
 
 
+#: Classe posée sur chaque card ordonnable ; `CARD_CLASS--<card_id>` porte
+#: l'identifiant. Partagée avec observatoire-dragdrop.js et style.css (#107).
+CARD_CLASS = "observatoire-card"
+
+
+def cards_drag_marker(store_id: str) -> html.Div:
+    """Balise invisible qui active le drag & drop sur son conteneur parent.
+
+    Le marqueur est glissé parmi les cards plutôt que posé sur le conteneur
+    lui-même : celui-ci est un `dbc.Row`, qui n'accepte aucune prop wildcard
+    `data-*`, et l'envelopper dans un `html.Div` casserait la grille Bootstrap
+    (`.row > div > .row`). `observatoire-dragdrop.js` remonte donc au
+    `parentElement` du marqueur pour trouver la liste à ordonner.
+
+    Les pages ne rendent ce marqueur que pour les abonné·es : son absence
+    désactive le drag & drop sans aucun contrôle de droits côté client.
+    """
+    return html.Div(
+        hidden=True,
+        **{"data-observatoire-cards": "", "data-card-order-store": store_id},
+    )
+
+
 def make_card(
-    title: str, subtitle=None, fig=None, paragraphs=None, lg=6, xl=4
+    title: str, subtitle=None, fig=None, paragraphs=None, lg=6, xl=4, card_id=None
 ) -> dbc.Col:
+    """Une card de l'observatoire.
+
+    `card_id` pose sur la colonne un id pattern-matching (pour les callbacks
+    Dash) et les classes `observatoire-card observatoire-card--<card_id>`
+    (pour le drag & drop côté client, issue #107).
+
+    Le card_id passe par une classe et non par un `data-card-id` parce que
+    `dbc.Col` n'accepte aucune prop wildcard : `_valid_wildcard_attributes`
+    y est vide, contrairement aux composants `dash.html`. Tous les card_ids
+    (`resume`, `cat-acheteur`, `carte-971`…) sont des noms de classe valides.
+    """
     children = []
     if title:
         children.append(html.H5(title, className="card-title"))
@@ -943,12 +979,18 @@ def make_card(
             p.className = "card-text"
             children.append(p)
 
+    col_kwargs = {}
+    if card_id is not None:
+        col_kwargs["id"] = {"type": "observatoire-card", "index": card_id}
+        col_kwargs["className"] = f"{CARD_CLASS} {CARD_CLASS}--{card_id}"
+
     card = dbc.Col(
         html.Div(html.Div(className="card-body", children=children), className="card"),
         lg=lg,
         xl=xl,
         # width=width,
         # className="mb-4",
+        **col_kwargs,
     )
     return card
 
@@ -1400,7 +1442,7 @@ def observatoire_cards_columns() -> list[str]:
     return [c for c in OBSERVATOIRE_CARDS_COLUMNS if c in schema.names()]
 
 
-def build_dashboard_cards(dff: pl.DataFrame) -> list:
+def build_dashboard_cards(dff: pl.DataFrame, order: list[str] | None = None) -> list:
     """Cards de l'observatoire pour un jeu de marchés déjà filtré.
 
     Partagé par la page /observatoire (filtres du panneau latéral) et par le
@@ -1408,6 +1450,12 @@ def build_dashboard_cards(dff: pl.DataFrame) -> list:
     affichent exactement les mêmes cards, seules les sources du filtrage
     diffèrent. `dff` doit contenir toutes les colonnes du schéma (les cards en
     utilisent bien plus que celles affichées dans la grille).
+
+    `order` est la liste des card_ids dans l'ordre choisi par l'utilisateur
+    (issue #107) ; None conserve l'ordre par défaut. Les appelants qui passent
+    par un cache mémoïsé doivent laisser `order` à None et appliquer
+    `reorder_cards` sur le résultat, pour ne pas multiplier les entrées de
+    cache par le nombre d'ordres possibles.
     """
     lff = dff.lazy()
 
@@ -1418,7 +1466,9 @@ def build_dashboard_cards(dff: pl.DataFrame) -> list:
 
     cards = []
     card_summary_table = get_dashboard_summary_table(dff, df_per_uid, nb_marches)
-    cards.append(make_card(title="Résumé", paragraphs=card_summary_table))
+    cards.append(
+        make_card(title="Résumé", paragraphs=card_summary_table, card_id="resume")
+    )
 
     donut_acheteur_categorie, nb_acheteur_categories = make_donut(
         lff,
@@ -1434,6 +1484,7 @@ def build_dashboard_cards(dff: pl.DataFrame) -> list:
             fig=donut_acheteur_categorie,
             lg=12 if nb_acheteur_categories > 4 else 6,
             xl=8 if nb_acheteur_categories > 4 else 4,
+            card_id="cat-acheteur",
         )
     )
 
@@ -1445,6 +1496,7 @@ def build_dashboard_cards(dff: pl.DataFrame) -> list:
             title="Catégorie d'entreprise",
             subtitle="en nombre de titulaires",
             fig=donut_titulaire_categorie,
+            card_id="cat-entreprise",
         )
     )
 
@@ -1454,6 +1506,7 @@ def build_dashboard_cards(dff: pl.DataFrame) -> list:
             title="Type d'achat",
             subtitle="en nombre de marchés attribués",
             fig=donut_marche_type,
+            card_id="type-achat",
         )
     )
 
@@ -1463,6 +1516,7 @@ def build_dashboard_cards(dff: pl.DataFrame) -> list:
             title="Considérations sociales et environnementales",
             subtitle="part des marchés concernés",
             fig=considerations_content,
+            card_id="considerations",
         )
     )
 
@@ -1472,18 +1526,35 @@ def build_dashboard_cards(dff: pl.DataFrame) -> list:
             title="Distance acheteur–titulaire",
             subtitle="en nombre de marchés, échelle logarithmique",
             fig=distance_histogram,
+            card_id="distance",
         )
     )
 
     top_acheteurs = get_top_org_table(
         lff, org_type="acheteur", filters=False, extra_columns=[]
     )
-    cards.append(make_card(title="Top acheteurs", fig=top_acheteurs, lg=12, xl=8))
+    cards.append(
+        make_card(
+            title="Top acheteurs",
+            fig=top_acheteurs,
+            lg=12,
+            xl=8,
+            card_id="top-acheteurs",
+        )
+    )
 
     top_titulaires = get_top_org_table(
         lff, org_type="titulaire", filters=False, extra_columns=[]
     )
-    cards.append(make_card(title="Top titulaires", fig=top_titulaires, lg=12, xl=8))
+    cards.append(
+        make_card(
+            title="Top titulaires",
+            fig=top_titulaires,
+            lg=12,
+            xl=8,
+            card_id="top-titulaires",
+        )
+    )
 
     geographic_maps: list[dbc.Col] | None = get_geographic_maps(dff)
 
@@ -1496,10 +1567,33 @@ def build_dashboard_cards(dff: pl.DataFrame) -> list:
             fig=sources_barchart,
             lg=12,
             xl=8,
+            card_id="sources-donnees",
         )
     )
 
-    return cards + geographic_maps + other_cards
+    toutes = cards + geographic_maps + other_cards
+    return toutes if order is None else reorder_cards(toutes, order)
+
+
+def card_id_of(card) -> str | None:
+    """card_id d'une card construite par `make_card`, ou None si elle n'en a pas."""
+    cid = getattr(card, "id", None)
+    if isinstance(cid, dict) and cid.get("type") == "observatoire-card":
+        return cid["index"]
+    return None
+
+
+def reorder_cards(cards: list, order: list[str]) -> list:
+    """Réordonne des cards déjà construites selon leurs card_ids (issue #107).
+
+    Le tri est stable : les cards sans card_id, ou dont le card_id est absent
+    de `order`, restent à la fin dans leur ordre d'origine. C'est ce qui rend
+    l'opération sûre face aux cartes géographiques, dont le nombre varie avec
+    le filtre : un `carte-<code>` absent de l'ordre enregistré ne disparaît pas,
+    il se range simplement après les cards explicitement ordonnées.
+    """
+    rang = {card_id: i for i, card_id in enumerate(order)}
+    return sorted(cards, key=lambda card: rang.get(card_id_of(card), len(order)))
 
 
 def montant_modal():

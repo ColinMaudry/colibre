@@ -520,3 +520,108 @@ def test_get_top_org_table_limit_above_row_count_is_harmless():
         _fake_marches(7, "acheteur"), "acheteur", [], filters=False
     )
     assert len(table.data) == 7
+
+
+# --- Ordre des cards de l'observatoire (issue #107) ---------------------------
+
+#: card_ids fixes attendus. `distance` est absent : la card n'est produite que
+#: si les colonnes de distance portent des valeurs, ce que le frame synthétique
+#: ne garantit pas.
+_CARD_IDS_FIXES = (
+    "resume",
+    "cat-acheteur",
+    "cat-entreprise",
+    "type-achat",
+    "considerations",
+    "top-acheteurs",
+    "top-titulaires",
+    "sources-donnees",
+)
+
+
+def _cards_de_test():
+    from src.figures import build_dashboard_cards, observatoire_cards_columns
+    from tests.test_observatoire_cards_columns import _frame
+
+    return build_dashboard_cards, _frame(observatoire_cards_columns())
+
+
+def _card_ids(cards) -> list[str]:
+    ids = []
+    for card in cards:
+        cid = getattr(card, "id", None)
+        if isinstance(cid, dict) and cid.get("type") == "observatoire-card":
+            ids.append(cid["index"])
+    return ids
+
+
+def test_build_dashboard_cards_assigns_card_ids():
+    """Chaque card fixe reçoit un card_id via le pattern-matching index."""
+    build_dashboard_cards, dff = _cards_de_test()
+
+    ids = _card_ids(build_dashboard_cards(dff))
+
+    for expected_id in _CARD_IDS_FIXES:
+        assert expected_id in ids, f"card_id manquant : {expected_id}"
+
+
+def test_build_dashboard_cards_with_order_reorders_cards():
+    """L'ordre passé en paramètre contrôle l'ordre des cards retournées."""
+    build_dashboard_cards, dff = _cards_de_test()
+
+    order = ["top-acheteurs", "resume", "cat-acheteur"]
+    ids = _card_ids(build_dashboard_cards(dff, order=order))
+
+    assert ids[:3] == order
+
+
+def test_build_dashboard_cards_order_none_keeps_default_order():
+    """Sans order, l'ordre par défaut est conservé."""
+    build_dashboard_cards, dff = _cards_de_test()
+
+    assert _card_ids(build_dashboard_cards(dff)) == _card_ids(
+        build_dashboard_cards(dff, order=None)
+    )
+
+
+def test_build_dashboard_cards_unknown_card_ids_in_order_ignored():
+    """Un card_id inconnu dans order est ignoré sans erreur."""
+    build_dashboard_cards, dff = _cards_de_test()
+
+    ids = _card_ids(build_dashboard_cards(dff, order=["inexistant", "resume"]))
+
+    assert ids[0] == "resume"
+    assert "inexistant" not in ids
+
+
+def test_build_dashboard_cards_order_partiel_garde_le_reste():
+    """Les cards absentes de order restent à la fin, dans l'ordre par défaut."""
+    build_dashboard_cards, dff = _cards_de_test()
+
+    defaut = _card_ids(build_dashboard_cards(dff))
+    ids = _card_ids(build_dashboard_cards(dff, order=["sources-donnees"]))
+
+    assert ids[0] == "sources-donnees"
+    assert ids[1:] == [cid for cid in defaut if cid != "sources-donnees"]
+
+
+def test_reorder_cards_reorders_built_cards():
+    """reorder_cards réordonne des cards déjà construites (après le cache)."""
+    from src.figures import reorder_cards
+
+    build_dashboard_cards, dff = _cards_de_test()
+    cards = build_dashboard_cards(dff)
+
+    ordre_inverse = list(reversed(_card_ids(cards)))
+
+    assert _card_ids(reorder_cards(cards, ordre_inverse)) == ordre_inverse
+
+
+def test_reorder_cards_ordre_vide_ne_change_rien():
+    """Un ordre vide laisse les cards dans leur ordre d'origine."""
+    from src.figures import reorder_cards
+
+    build_dashboard_cards, dff = _cards_de_test()
+    cards = build_dashboard_cards(dff)
+
+    assert _card_ids(reorder_cards(cards, [])) == _card_ids(cards)

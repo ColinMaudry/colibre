@@ -15,15 +15,20 @@ from dash import (
     no_update,
     register_page,
 )
+from flask_login import current_user
 
 from src.db import schema
 from src.figures import (
     DataTable,
     build_dashboard_cards,
+    cards_drag_marker,
     make_column_picker,
     montant_modal,
     observatoire_cards_columns,
+    reorder_cards,
 )
+from src.observatoire_order import get_card_order, save_card_order
+from src.pages._compte_shell import current_user_has_subscription
 from src.utils import logger
 from src.utils.cache import cache
 from src.utils.data import (
@@ -93,6 +98,14 @@ OBSERVATOIRE_COLUMNS = [
 layout = [
     dcc.Location(id="dashboard_url", refresh="callback-nav"),
     dcc.Store(id="observatoire-filters", storage_type="local"),
+    # Ordre des cards chargé depuis la base au rendu de la page (#107).
+    dcc.Store(id="observatoire-card-order"),
+    # Ordre poussé par observatoire-dragdrop.js après un glisser-déposer. Store
+    # distinct du précédent : s'ils n'en faisaient qu'un, le callback qui le lit
+    # pour persister serait aussi celui qui l'écrit — Dash refuse ce cycle.
+    dcc.Store(id="observatoire-card-order-nouveau"),
+    # Puits de sortie : persist_card_order écrit en base, pas dans le layout.
+    dcc.Store(id="observatoire-card-order-persiste"),
     dcc.Store(id="observatoire-hidden-columns", storage_type="local"),
     dcc.Store(
         id="filter-cleanup-trigger-observatoire-preview"
@@ -664,9 +677,10 @@ def _compute_dashboard_children(filter_params_normalized: tuple):
 @callback(
     Output("cards", "children"),
     Output("observatoire-filters", "data"),
+    Input("observatoire-card-order", "data"),
     *[Input(fp[0], "value") for fp in FILTER_PARAMS],
 )
-def update_dashboard_cards(*filter_values):
+def update_dashboard_cards(card_order, *filter_values):
     filter_params = {}
     for (input_id, _url_key, _is_multi, _default), value in zip(
         FILTER_PARAMS, filter_values
@@ -676,7 +690,46 @@ def update_dashboard_cards(*filter_values):
     filter_params_normalized = _normalize_filter_params(filter_params)
     children = _compute_dashboard_children(filter_params_normalized)
 
+    # L'ordre est appliqué APRÈS le cache mémoïsé : le mettre dans
+    # _compute_dashboard_children multiplierait les entrées de cache par le
+    # nombre d'ordres possibles (#107).
+    if card_order:
+        children = reorder_cards(children, card_order)
+
+    if current_user_has_subscription():
+        children = [cards_drag_marker("observatoire-card-order-nouveau"), *children]
+
     return dbc.Row(children=children), filter_params
+
+
+@callback(
+    Output("observatoire-card-order", "data"),
+    Input("dashboard_url", "pathname"),
+)
+def load_card_order(_pathname):
+    """Ordre enregistré par l'utilisateur, relu à chaque rendu de la page."""
+    if not current_user.is_authenticated or not current_user_has_subscription():
+        return None
+    return get_card_order(current_user.id)
+
+
+@callback(
+    Output("observatoire-card-order-persiste", "data"),
+    Input("observatoire-card-order-nouveau", "data"),
+    prevent_initial_call=True,
+)
+def persist_card_order(card_order):
+    """Enregistre l'ordre poussé par le drag & drop.
+
+    La sortie est un Store puits : le rendu des cards n'a pas à être refait,
+    le DOM est déjà dans le bon ordre côté client.
+    """
+    if not card_order:
+        return no_update
+    if not current_user.is_authenticated or not current_user_has_subscription():
+        return no_update
+    save_card_order(current_user.id, card_order)
+    return card_order
 
 
 @callback(

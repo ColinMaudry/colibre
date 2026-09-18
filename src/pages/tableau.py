@@ -23,10 +23,13 @@ from src.db import query_marches, schema
 from src.figures import (
     ag_grid,
     build_dashboard_cards,
+    cards_drag_marker,
     make_column_picker,
     montant_modal,
     observatoire_cards_columns,
+    reorder_cards,
 )
+from src.observatoire_order import get_card_order, save_card_order
 from src.pages._compte_shell import current_user_has_subscription
 from src.saved_views import db as saved_views_db
 from src.saved_views import resolve as saved_views_resolve
@@ -171,6 +174,14 @@ def _help_button_legend():
 layout = [
     dcc.Location(id="tableau_url", refresh=False),
     dcc.Store(id="tableau-hidden-columns", storage_type="local"),
+    # Ordre des cards du mode observatoire (#107). Même table, même clé
+    # (user_id) que /observatoire : les deux pages partagent un seul ordre.
+    dcc.Store(id="tableau-card-order"),
+    # Ordre poussé par observatoire-dragdrop.js ; Store distinct du précédent
+    # pour que le callback de persistance ne soit pas son propre Input.
+    dcc.Store(id="tableau-card-order-nouveau"),
+    # Puits de sortie : la persistance écrit en base, pas dans le layout.
+    dcc.Store(id="tableau-card-order-persiste"),
     dcc.Store(id="tableau-table"),
     dcc.Store(id="tableau-total"),
     dcc.Store(id="tableau-total-unique"),
@@ -1022,9 +1033,10 @@ def _cards_pour_filtre(filter_model_json: str):
     Output("tableau-observatoire-cards", "className"),
     Input("tableau-mode-observatoire", "value"),
     Input("tableau_grid", "filterModel"),
+    Input("tableau-card-order", "data"),
     prevent_initial_call=True,
 )
-def update_mode_observatoire_cards(mode_actif, filter_model):
+def update_mode_observatoire_cards(mode_actif, filter_model, card_order):
     if not mode_actif:
         # On masque sans vider : les cards déjà calculées restent montées, donc
         # le retour au mode observatoire est instantané tant que le filtre n'a
@@ -1048,9 +1060,42 @@ def update_mode_observatoire_cards(mode_actif, filter_model):
         )
 
     track_search(json.dumps(filter_model), "tab observatoire")
-    return _cards_pour_filtre(_normalize_filter_model(filter_model)), (
+    cards = _cards_pour_filtre(_normalize_filter_model(filter_model))
+
+    # Après le cache mémoïsé de _cards_pour_filtre, jamais dedans : l'ordre
+    # ferait exploser la cardinalité des entrées (#107).
+    if card_order:
+        cards = reorder_cards(cards, card_order)
+
+    return [cards_drag_marker("tableau-card-order-nouveau"), *cards], (
         MODE_OBSERVATOIRE_CLASSES
     )
+
+
+@callback(
+    Output("tableau-card-order", "data"),
+    Input("tableau_url", "pathname"),
+)
+def load_tableau_card_order(_pathname):
+    """Ordre enregistré par l'utilisateur, relu à chaque rendu de la page."""
+    if not current_user.is_authenticated or not current_user_has_subscription():
+        return None
+    return get_card_order(current_user.id)
+
+
+@callback(
+    Output("tableau-card-order-persiste", "data"),
+    Input("tableau-card-order-nouveau", "data"),
+    prevent_initial_call=True,
+)
+def persist_tableau_card_order(card_order):
+    """Enregistre l'ordre poussé par le drag & drop du mode observatoire."""
+    if not card_order:
+        return no_update
+    if not current_user.is_authenticated or not current_user_has_subscription():
+        return no_update
+    save_card_order(current_user.id, card_order)
+    return card_order
 
 
 @callback(
