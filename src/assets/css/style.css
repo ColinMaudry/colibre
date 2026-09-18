@@ -1337,3 +1337,8 @@ input[type="number"] {
   outline: 2px dashed var(--bs-primary, #007bff);
   outline-offset: -2px;
 }
+
+/* Switch clair / sombre du menu « Mon compte » (#118) */
+.theme-switch .form-check-input {
+  cursor: pointer;
+}

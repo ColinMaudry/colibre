@@ -28,6 +28,7 @@ from dash import (
     page_container,
     page_registry,
 )
+from dash.exceptions import PreventUpdate
 from dotenv import load_dotenv
 from flask import Flask, Response, redirect, send_from_directory
 from flask_login import current_user
@@ -35,7 +36,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.admin.guard import is_admin
 from src.auth.setup import init_auth
-from src.theme import SOMBRE, current_theme
+from src.theme import CLAIR, SOMBRE, current_theme, get_theme, save_theme
 from src.utils import DEVELOPMENT
 from src.utils.cache import (
     cache,
@@ -576,6 +577,7 @@ navbar = dbc.Navbar(
 app.layout = html.Div(
     [
         dcc.Store(id="csrf-token"),
+        dcc.Store(id="theme-enregistre"),
         navbar,
         dbc.Container(
             page_container,
@@ -650,10 +652,29 @@ def _auth_nav(_, pathname=None):
         visible_sections,
     )
 
+    abonne = current_user_has_subscription()
     sections = [
         dbc.DropdownMenuItem(section["label"], href=section["href"])
-        for section in visible_sections(current_user_has_subscription())
+        for section in visible_sections(abonne)
     ]
+    # Mode sombre réservé aux abonné·es (#118) : masqué plutôt que grisé,
+    # comme les sections réservées (#133).
+    if abonne:
+        sections.append(
+            html.Div(
+                [
+                    html.Span("☀", **{"aria-hidden": "true"}),
+                    dbc.Switch(
+                        id="theme-switch",
+                        value=get_theme(current_user.id) == SOMBRE,
+                        label="Mode sombre",
+                        className="theme-switch mb-0",
+                    ),
+                    html.Span("☾", **{"aria-hidden": "true"}),
+                ],
+                className="dropdown-item-text d-flex align-items-center gap-2",
+            )
+        )
     return dbc.DropdownMenu(
         label="Mon compte",
         nav=True,
@@ -668,6 +689,40 @@ def _auth_nav(_, pathname=None):
             logout_form("navbar-logout", "dropdown-item"),
         ],
     )
+
+
+@callback(
+    Output("theme-enregistre", "data"),
+    Input("theme-switch", "value"),
+    prevent_initial_call=True,
+)
+def _enregistrer_theme(sombre):
+    """Enregistre le thème choisi ; le rechargement est fait côté client.
+
+    Le switch n'est affiché qu'aux abonné·es, mais un callback se déclenche
+    aussi à la main : le droit est revérifié ici.
+    """
+    from src.pages._compte_shell import current_user_has_subscription
+
+    if not current_user.is_authenticated or not current_user_has_subscription():
+        raise PreventUpdate
+    theme = SOMBRE if sombre else CLAIR
+    save_theme(current_user.id, theme)
+    return theme
+
+
+app.clientside_callback(
+    """
+    function(theme) {
+        // Le thème s'applique côté serveur (<html>, figures) : on recharge.
+        if (theme) { window.location.reload(); }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("theme-enregistre", "id"),
+    Input("theme-enregistre", "data"),
+    prevent_initial_call=True,
+)
 
 
 @callback(
