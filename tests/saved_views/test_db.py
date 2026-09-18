@@ -72,7 +72,13 @@ def test_delete_only_affects_owner(users_db_path):
 
 
 def test_views_deleted_on_user_cascade(users_db_path):
+    from src.migrations import apply_pending
+
     db.init_schema()
+    # En production, apply_pending() tourne toujours au démarrage avant tout
+    # appel à delete_user (celui-ci nettoie aussi user_preferences et
+    # observatoire_card_order, créées par les migrations 0015/0016).
+    apply_pending()
     uid = _make_user()
     db.upsert(uid, "tableau", "Vue A", "filtres=a")
     auth_db.delete_user(uid)

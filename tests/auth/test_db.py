@@ -160,11 +160,65 @@ def test_purge_expired_tokens(users_db_path):
 
 
 def test_cascade_delete_on_user_delete(users_db_path):
+    from src.migrations import apply_pending
+
     init_schema()
+    # En production, apply_pending() tourne toujours au démarrage avant tout
+    # appel à delete_user (celui-ci nettoie aussi user_preferences et
+    # observatoire_card_order, créées par les migrations 0015/0016).
+    apply_pending()
     uid = create_user("a@b.c", "h")
     create_email_verification_token("t", uid, _future(1))
     delete_user(uid)
     assert find_email_verification_token("t") is None
+
+
+def test_delete_user_supprime_les_preferences_orphelines(users_db_path):
+    """`user_preferences` (thème #118) n'a pas de FK ON DELETE CASCADE vers
+    `users` : `delete_user` doit nettoyer la ligne explicitement."""
+    from src.migrations import apply_pending
+    from src.theme import SOMBRE, get_theme, save_theme
+
+    init_schema()
+    apply_pending()
+    uid = create_user("a@b.c", "h")
+
+    save_theme(uid, SOMBRE)
+    assert get_theme(uid) == SOMBRE  # ancre positive : la ligne existe bien
+
+    delete_user(uid)
+
+    row = (
+        get_conn()
+        .execute("SELECT 1 FROM user_preferences WHERE user_id = ?", (uid,))
+        .fetchone()
+    )
+    assert row is None
+
+
+def test_delete_user_supprime_l_ordre_des_cards_observatoire_orphelin(
+    users_db_path,
+):
+    """`observatoire_card_order` (#107) n'a pas non plus de FK cascade :
+    même nettoyage explicite que `user_preferences`."""
+    from src.migrations import apply_pending
+    from src.observatoire_order import get_card_order, save_card_order
+
+    init_schema()
+    apply_pending()
+    uid = create_user("a@b.c", "h")
+
+    save_card_order(uid, ["resume", "distance"])
+    assert get_card_order(uid) == ["resume", "distance"]  # ancre positive
+
+    delete_user(uid)
+
+    row = (
+        get_conn()
+        .execute("SELECT 1 FROM observatoire_card_order WHERE user_id = ?", (uid,))
+        .fetchone()
+    )
+    assert row is None
 
 
 def test_pending_email_column_exists(users_db_path):
