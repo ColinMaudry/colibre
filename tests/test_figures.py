@@ -549,7 +549,7 @@ def test_get_top_org_ag_grid_returns_grid_with_rowdata():
 
 
 def test_get_top_org_ag_grid_empty_returns_div():
-    """Données vides → html.Div() (parité get_top_org_table)."""
+    """Données vides → html.Div()."""
     import polars as pl
     from dash import html
 
@@ -562,23 +562,9 @@ def test_get_top_org_ag_grid_empty_returns_div():
     assert isinstance(out, html.Div)
 
 
-def test_get_top_org_table_still_returns_datatable_after_refactor():
-    """Non-régression : get_top_org_table (utilisé par observatoire.py) garde
-    son comportement après extraction du helper d'agrégation partagé."""
-    import dash_ag_grid  # noqa: F401
-    from dash import html
-
-    from src.db import query_marches
-    from src.figures import DataTable, get_top_org_table
-
-    lff = query_marches("TRUE", (), columns=None).lazy()
-    out = get_top_org_table(lff, "titulaire", ["titulaire_distance"])
-    assert isinstance(out, (DataTable, html.Div))
-
-
 def test_top_org_aggregate_does_not_mutate_extra_columns():
     """Le helper ne mute pas la liste extra_columns passée (bug latent de
-    l'ancien get_top_org_table, qui faisait extra_columns.append(...))."""
+    l'ancien tableau dash_table, qui faisait extra_columns.append(...))."""
     from src.db import query_marches
     from src.figures import _top_org_aggregate
 
@@ -611,41 +597,10 @@ def _fake_marches(n_orgs: int, org_type: str = "titulaire"):
     return pl.DataFrame(rows).lazy()
 
 
-def test_get_top_org_table_truncates_to_limit():
-    """La pagination de DataTable est côté client : sans troncature, toutes
-    les lignes transitent par le navigateur pour n'en afficher que 10."""
-    from src.figures import get_top_org_table
-
-    lff = _fake_marches(120)
-    complet = get_top_org_table(lff, "titulaire", [], filters=False, limit=None)
-    tronque = get_top_org_table(lff, "titulaire", [], filters=False, limit=100)
-
-    assert len(complet.data) == 120
-    assert len(tronque.data) == 100
-    # l'agrégat est trié par Attributions décroissant : on garde bien la tête
-    # du classement, pas 100 lignes au hasard
-    gardes = {row["titulaire_nom_tooltip"] for row in tronque.data}
-    assert gardes == {f"Org {i}" for i in range(100)}
-
-
-def test_get_top_org_table_defaults_to_100_rows():
-    from src.figures import get_top_org_table
-
-    table = get_top_org_table(_fake_marches(120), "titulaire", [], filters=False)
-    assert len(table.data) == 100
-
-
-def test_get_top_org_table_limit_above_row_count_is_harmless():
-    from src.figures import get_top_org_table
-
-    table = get_top_org_table(
-        _fake_marches(7, "acheteur"), "acheteur", [], filters=False
-    )
-    assert len(table.data) == 7
-
-
 def test_get_top_org_ag_grid_truncates_to_limit():
-    """Même troncature que get_top_org_table, mais sur grid.rowData."""
+    """La pagination d'AG Grid en mode client-side est côté client : sans
+    troncature, toutes les lignes transitent par le navigateur pour n'en
+    afficher que 10."""
     from src.figures import get_top_org_ag_grid
 
     lff = _fake_marches(120)
@@ -717,6 +672,29 @@ def test_build_dashboard_cards_assigns_card_ids():
 
     for expected_id in _CARD_IDS_FIXES:
         assert expected_id in ids, f"card_id manquant : {expected_id}"
+
+
+def test_build_dashboard_cards_top_org_cards_use_ag_grid():
+    """Les cards top-acheteurs/top-titulaires passent en AG Grid (#141) : fini
+    le DataTable, dont le dark mode dépend d'un CSS spécifique."""
+    import dash_ag_grid as dag
+    from dash import dash_table
+
+    build_dashboard_cards, dff = _cards_de_test()
+    cards = build_dashboard_cards(dff)
+
+    for card_id in ("top-acheteurs", "top-titulaires"):
+        card = next(
+            c
+            for c in cards
+            if isinstance(getattr(c, "id", None), dict) and c.id.get("index") == card_id
+        )
+        grids = _find_components(card, dag.AgGrid)
+        tables = _find_components(card, dash_table.DataTable)
+
+        assert grids, f"aucune AgGrid dans la card {card_id}"
+        assert grids[0].rowData, f"AgGrid sans lignes dans la card {card_id}"
+        assert not tables, f"DataTable encore présent dans la card {card_id}"
 
 
 def test_build_dashboard_cards_with_order_reorders_cards():

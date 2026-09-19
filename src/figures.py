@@ -18,7 +18,7 @@ from src.db import schema
 from src.theme import SOMBRE, current_theme
 from src.utils import logger
 from src.utils.data import DATA_SCHEMA, DEPARTEMENTS_GEOJSON, schema_field_rows
-from src.utils.table import add_links, format_number, setup_table_columns
+from src.utils.table import add_links, format_number
 
 ORG_COLORS = {
     "acheteur": "#E69F00",  # orange
@@ -99,45 +99,6 @@ def appliquer_theme(fig: go.Figure, theme: str) -> go.Figure:
     )
     fig.update_geos(bgcolor=FOND_SOMBRE)
     return fig
-
-
-def get_yearly_statistics(statistics, today_str) -> html.Div:
-    # Build DataFrame from statistics
-    years = list(reversed(range(2018, int(today_str.split("/")[-1]) + 1)))
-    data = []
-    for year in years:
-        year_str = str(year)
-        stat = statistics[year_str]
-        data.append(
-            {
-                "Année": year_str,
-                "Marchés et accord-cadres": format_number(
-                    stat["nb_notifications_marches"]
-                ),
-                "Acheteurs": format_number(stat["nb_acheteurs_uniques"]),
-                "Titulaires": format_number(stat["nb_titulaires_uniques"]),
-            }
-        )
-
-    dff = pl.DataFrame(data)
-
-    # Create Dash DataTable
-    table = dash_table.DataTable(
-        data=dff.to_dicts(),
-        columns=[
-            {"name": "Année", "id": "Année"},
-            {"name": "Marchés et accord-cadres", "id": "Marchés et accord-cadres"},
-            {"name": "Acheteurs", "id": "Acheteurs"},
-            {"name": "Titulaires", "id": "Titulaires"},
-        ],
-        page_size=10,
-        sort_action="none",
-        filter_action="none",
-        style_header={"fontFamily": "Inter", "fontSize": "16px"},
-        style_cell={"fontFamily": "Inter", "fontSize": "16px"},
-    )
-
-    return html.Div(children=table, className="marches_table")
 
 
 def get_barchart_sources(lff: pl.LazyFrame, type_date: str, theme: str | None = None):
@@ -1269,7 +1230,7 @@ def make_schema_grid():
 
 
 def _top_org_aggregate(data, org_type: str, extra_columns: list):
-    """Agrégation « top N » commune à get_top_org_table et get_top_org_ag_grid.
+    """Agrégation « top N » utilisée par get_top_org_ag_grid.
 
     Renvoie le DataFrame agrégé (colonnes castées en str, tri par Attributions
     décroissant), AVANT add_links, ou None si vide/colonne manquante.
@@ -1303,46 +1264,6 @@ def _top_org_aggregate(data, org_type: str, extra_columns: list):
     return dff if dff.height > 0 else None
 
 
-def get_top_org_table(
-    data,
-    org_type: str,
-    extra_columns: list,
-    filters: bool = True,
-    limit: int | None = 100,
-):
-    """Palmarès des organisations les plus attributaires.
-
-    La pagination de DataTable est côté client : toutes les lignes passées à
-    `data` transitent par le navigateur, même si seules `page_size` sont
-    visibles. Sans `limit`, l'observatoire expédiait ainsi 82 934 titulaires
-    (33,6 Mo de JSON) pour en afficher 10. L'agrégat étant déjà trié par
-    nombre d'attributions décroissant, tronquer conserve bien les mieux
-    classés. `limit=None` restaure l'envoi intégral.
-    """
-    dff = _top_org_aggregate(data, org_type, extra_columns)
-    if dff is None:
-        return html.Div()
-
-    if limit is not None:
-        dff = dff.head(limit)
-
-    columns, tooltip = setup_table_columns(
-        dff, hideable=False, exclude=[f"{org_type}_id"]
-    )
-    dff = add_links(dff)
-    data = dff.to_dicts()
-
-    return DataTable(
-        dtid=f"top10_{org_type}",
-        data=data,
-        page_action="native",
-        page_size=10,
-        columns=columns,
-        tooltip_header=tooltip,
-        filter_action="native" if filters else "none",
-    )
-
-
 def get_top_org_ag_grid(
     data,
     org_type: str,
@@ -1352,8 +1273,7 @@ def get_top_org_ag_grid(
 ):
     """Top N acheteurs/titulaires en AG Grid client-side (rowData directe).
 
-    Remplace get_top_org_table (dash_table) : même agrégation (helper partagé),
-    rendu AG Grid (thème brique, liens markdown). html.Div() si vide/erreur.
+    Rendu AG Grid (thème brique, liens markdown). html.Div() si vide/erreur.
 
     La pagination d'AG Grid en mode client-side est côté client : toutes les
     lignes passées à `rowData` transitent par le navigateur, même si seules
@@ -1690,8 +1610,8 @@ def build_dashboard_cards(
         )
     )
 
-    top_acheteurs = get_top_org_table(
-        lff, org_type="acheteur", filters=False, extra_columns=[]
+    top_acheteurs = get_top_org_ag_grid(
+        lff, org_type="acheteur", extra_columns=[], filters=False
     )
     cards.append(
         make_card(
@@ -1703,8 +1623,8 @@ def build_dashboard_cards(
         )
     )
 
-    top_titulaires = get_top_org_table(
-        lff, org_type="titulaire", filters=False, extra_columns=[]
+    top_titulaires = get_top_org_ag_grid(
+        lff, org_type="titulaire", extra_columns=[], filters=False
     )
     cards.append(
         make_card(
