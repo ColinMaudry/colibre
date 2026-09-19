@@ -667,7 +667,7 @@ def _auth_nav(_, pathname=None):
                     dbc.Switch(
                         id="theme-switch",
                         value=get_theme(current_user.id) == SOMBRE,
-                        label="Mode sombre",
+                        label="",
                         className="theme-switch mb-0",
                     ),
                     html.Span("☾", **{"aria-hidden": "true"}),
