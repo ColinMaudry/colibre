@@ -1196,7 +1196,13 @@ def make_column_picker(page: str):
 clientside_callback(
     """
     function (value, id) {
-        const api = dash_ag_grid.getApi(id.page + "_column_list");
+        // getApi lève une erreur si la grille n'est pas (encore) montée.
+        let api;
+        try {
+            api = dash_ag_grid.getApi(id.page + "_column_list");
+        } catch (e) {
+            return;
+        }
         if (api) { api.setGridOption("quickFilterText", value || ""); }
     }
     """,

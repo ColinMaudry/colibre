@@ -890,6 +890,9 @@ def store_hidden_columns(hidden_columns):
 
 @callback(
     Output("observatoire_preview_column_list", "selectedRows"),
+    # La modale démonte la grille à la fermeture : la grille recréée à la
+    # réouverture n'a plus de filtre rapide, le champ de recherche est vidé.
+    Output({"type": "column-search", "page": "observatoire_preview"}, "value"),
     Input("observatoire-preview-columns-modal", "is_open"),
     State("observatoire-hidden-columns", "data"),
 )
@@ -904,7 +907,7 @@ def update_checkboxes_from_hidden_columns(is_open, hidden_cols):
     ce second écrivain existe (application d'une vue partagée).
     """
     if not is_open:
-        return no_update
+        return no_update, no_update
 
     # None = pas encore de préférence ; [] = choix explicite de tout
     # afficher, à respecter tel quel (même distinction que la garde de
@@ -913,7 +916,7 @@ def update_checkboxes_from_hidden_columns(is_open, hidden_cols):
         hidden_cols = get_default_hidden_columns("tableau")
 
     # Coche toutes les colonnes qui ne sont PAS masquées
-    return selection_from_hidden_columns(hidden_cols)
+    return selection_from_hidden_columns(hidden_cols), ""
 
 
 @callback(

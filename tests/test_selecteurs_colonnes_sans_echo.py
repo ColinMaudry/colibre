@@ -60,6 +60,33 @@ def test_aucun_declencheur_permanent(module, cases, modale, store):
     assert '"hidden_columns"' not in declaration
 
 
+# (module, id des cases, page du champ de recherche du sélecteur)
+RECHERCHES = [
+    ("acheteur", "acheteur_column_list", "acheteur"),
+    ("titulaire", "titulaire_column_list", "titulaire"),
+    ("observatoire", "observatoire_preview_column_list", "observatoire_preview"),
+]
+
+
+@pytest.mark.parametrize("module,cases,page", RECHERCHES)
+def test_louverture_de_la_modale_vide_la_recherche(module, cases, page):
+    """La modale démonte la grille à la fermeture : à la réouverture, la grille
+    recréée n'a plus de filtre rapide. Le champ de recherche doit être vidé
+    avec elle, sinon il affiche un filtre qui ne s'applique plus (#141)."""
+    from dash import no_update
+
+    declaration = _declaration(module, cases)
+    assert (
+        f'Output({{"type": "column-search", "page": "{page}"}}, "value")' in declaration
+    )
+
+    cb = _module(module).update_checkboxes_from_hidden_columns
+    coches, recherche = cb(True, [])
+    assert "ids" in coches  # les cases sont bien alimentées à l'ouverture
+    assert recherche == ""
+    assert cb(False, []) == (no_update, no_update)
+
+
 # Garde anti-écho du callback « cases → store » (#141). Poser `selectedRows`
 # depuis le serveur à l'ouverture de la modale fait réémettre `selectedRows`
 # par AG Grid : si l'état qu'il en déduit est celui du store, rien ne doit être

@@ -719,6 +719,9 @@ def apply_hidden_columns(hidden_columns, column_state):
 
 @callback(
     Output("tableau_column_list", "selectedRows"),
+    # La modale démonte la grille à la fermeture : la grille recréée à la
+    # réouverture n'a plus de filtre rapide, le champ de recherche est vidé.
+    Output({"type": "column-search", "page": "tableau"}, "value"),
     Input("tableau_columns", "is_open"),
     State("tableau-hidden-columns", "data"),
 )
@@ -736,7 +739,7 @@ def update_checkboxes_from_hidden_columns(is_open, hidden_cols):
     store contient déjà : l'écriture est sans effet.
     """
     if not is_open:
-        return no_update
+        return no_update, no_update
 
     # None = pas encore de préférence enregistrée (première visite) ; []
     # est un choix explicite (« ne rien masquer »/tout afficher) et doit
@@ -745,7 +748,7 @@ def update_checkboxes_from_hidden_columns(is_open, hidden_cols):
         hidden_cols = get_default_hidden_columns("tableau")
 
     # Coche toutes les colonnes qui ne sont PAS masquées
-    return selection_from_hidden_columns(hidden_cols)
+    return selection_from_hidden_columns(hidden_cols), ""
 
 
 @callback(

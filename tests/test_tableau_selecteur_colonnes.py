@@ -130,6 +130,16 @@ def test_la_recherche_filtre_les_colonnes(dash_duo: DashComposite):
         f"le filtre n'a pas réduit la liste : {len(filtrees)} / {len(toutes)}"
     )
 
+    # La modale démonte la grille à la fermeture : à la réouverture, le champ
+    # ne doit plus afficher un filtre que la grille recréée n'applique pas.
+    dash_duo.driver.find_element(By.ID, "tableau_columns_close").click()
+    time.sleep(1)
+    _ouvrir_la_modale(dash_duo)
+
+    champ = dash_duo.driver.find_element(By.CSS_SELECTOR, RECHERCHE)
+    assert champ.get_attribute("value") == ""
+    assert len(_etat_des_cases(dash_duo)) == len(toutes)
+
 
 def test_tout_cocher_avec_un_filtre_ne_coche_que_les_lignes_filtrees(
     dash_duo: DashComposite,
