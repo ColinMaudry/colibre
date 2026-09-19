@@ -42,14 +42,16 @@ Nouvelle fonction dans `src/figures.py`, pendant client-side de `ag_grid()`
 (qui reste dédiée au modèle `infinite`) :
 
 ```python
-def client_grid(grid_id, column_defs, row_data, page_size=None, **dash_grid_options) -> dag.AgGrid
+def client_grid(grid_id, column_defs, row_data, *, page_size=None, dash_grid_options=None, **ag_grid_kwargs) -> dag.AgGrid
 ```
 
 Elle centralise ce que `get_top_org_ag_grid` et `make_schema_grid` recopient
 chacune : `AG_GRID_THEME`, `localeText: AG_GRID_LOCALE_FR`,
 `domLayout: "autoHeight"`, `suppressCellFocus`, `dangerously_allow_code=True`,
 `persistence=False`, `style={"width": "100%"}`. `page_size` active la
-pagination. Les options supplémentaires sont fusionnées dans `dashGridOptions`.
+pagination. `dash_grid_options` est fusionné dans `dashGridOptions` (et peut
+surcharger les valeurs communes) ; `ag_grid_kwargs` est passé tel quel à
+`dag.AgGrid` (`defaultColDef`, `getRowId`, `columnSize`…).
 
 `get_top_org_ag_grid` et `make_schema_grid` sont réécrites sur `client_grid`,
 sans changement visible.
@@ -91,7 +93,9 @@ sans changement visible.
 
 `make_column_picker(page)` renvoie :
 
-- un `dbc.Input` « Rechercher une colonne… », id `{page}_column_search` ;
+- un `dbc.Input` « Rechercher une colonne… », id
+  `{"type": "column-search", "page": page}` (id à motif, pour qu'un seul
+  callback clientside `MATCH` serve les quatre pages) ;
 - une `client_grid` d'id `{page}_column_list` (id conservé) :
   - colonnes Nom et Description (Description avec retour à la ligne) ;
   - `getRowId: params.data.id` (l'id de colonne du schéma) ;
@@ -99,8 +103,10 @@ sans changement visible.
     limitée aux lignes filtrées ;
   - pas de pagination (la modale garde son défilement).
 
-Un callback **clientside** relie `{page}_column_search.value` à
-`dashGridOptions.quickFilterText` de la grille, sans aller-retour serveur. Le
+Un callback **clientside** unique (`MATCH` sur `page`) applique la valeur du
+champ à la grille `{page}_column_list` via
+`dash_ag_grid.getApi(...).setGridOption("quickFilterText", …)`, sans
+aller-retour serveur. Le
 filtre rapide porte sur le nom et la description.
 
 ### Callbacks (4 pages, même schéma)
@@ -142,7 +148,6 @@ index dans `COLUMNS`, ce qui les rend robustes aux évolutions du schéma.
 ### Grille
 
 - `client_grid("admin-table", …)` paginée par 20, triable, filtres flottants.
-- `getRowId` : la clé primaire de la table (`cfg.pk`).
 - `_columns_for(table)` produit des `columnDefs` :
   - `editable: col in cfg.editable_columns` ;
   - colonnes de `cfg.dropdowns` : `cellEditor: "agSelectCellEditor"`,
@@ -159,9 +164,11 @@ index dans `COLUMNS`, ce qui les rend robustes aux évolutions du schéma.
   clé primaire).
   - La garde `is_admin()` reste la première instruction (#110).
   - `set_cell`, `log_action` et les alertes sont inchangés.
-  - **En cas de `ValueError`** : on renvoie
-    `rowTransaction = {"update": [ligne avec l'ancienne valeur]}` pour que la
-    cellule reprenne sa valeur (aujourd'hui, elle garde la valeur refusée).
+  - **En cas de `ValueError`** : on renvoie `rowData = get_rows(table)`, relu
+    en base, pour que la cellule reprenne sa valeur (aujourd'hui, elle garde
+    la valeur refusée). Pas de `getRowId` ni de `rowTransaction` : `getRowId`
+    est une option initiale d'AG Grid, qui ne suivrait pas le changement de
+    table (et donc de clé primaire).
 - `find_changed_cell` est supprimée avec ses tests.
 
 ### Tests
