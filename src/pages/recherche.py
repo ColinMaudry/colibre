@@ -1,20 +1,39 @@
 import math
 
 import dash_bootstrap_components as dbc
+import polars as pl
 from dash import Input, Output, State, callback, dcc, html, register_page
 
 from src.db import count_unique_marches, schema
-from src.figures import DataTable
+from src.figures import client_grid
 from src.pages.projet.abonnement import abonnement_features
 from src.utils.cache import cache
-from src.utils.data import DF_ACHETEURS, DF_TITULAIRES
+from src.utils.data import DATA_SCHEMA, DF_ACHETEURS, DF_TITULAIRES
 from src.utils.search import search_org
 from src.utils.seo import META_CONTENT
-from src.utils.table import format_number, setup_table_columns
+from src.utils.table import format_number
 
 NAME = "Recherche"
 
 _STAT_STYLE = {"fontWeight": "bold", "color": "var(--primary-color-text)"}
+
+
+def _result_column_defs(dff: pl.DataFrame) -> list[dict]:
+    """columnDefs des résultats de recherche (liens markdown, infobulle d'en-tête)."""
+    defs = []
+    for col in dff.columns:
+        meta = DATA_SCHEMA.get(col, {})
+        col_def = {
+            "field": col,
+            "headerName": meta.get("title", col),
+            "cellRenderer": "markdown",
+            "wrapText": True,
+            "autoHeight": True,
+        }
+        if meta.get("description"):
+            col_def["headerTooltip"] = meta["description"]
+        defs.append(col_def)
+    return defs
 
 
 @cache.memoize(timeout=12 * 60 * 60)
@@ -276,20 +295,21 @@ def update_search_results(n_submit, n_clicks, query):
             results = search_org(dff, query, org_type=org_type)
             count = results.height
 
-            # Format output
-            columns, tooltip = setup_table_columns(results, hideable=False)
-
             col = (
                 dbc.Col(
                     children=[
                         html.H3(f"{org_type.title()}s : {count}"),
-                        DataTable(
-                            dtid=f"results_{org_type}_datatable",
-                            columns=columns,
-                            data=results.to_dicts(),
+                        client_grid(
+                            f"results_{org_type}_datatable",
+                            _result_column_defs(results),
+                            results.to_dicts(),
                             page_size=10,
-                            sort_action="none",
-                            filter_action="none",
+                            defaultColDef={
+                                "sortable": False,
+                                "filter": False,
+                                "flex": 1,
+                                "minWidth": 120,
+                            },
                         ),
                     ],
                     md=6,
