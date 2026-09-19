@@ -31,6 +31,7 @@ ORG_COLORS = {
 FOND_SOMBRE = "#292520"
 TEXTE_SOMBRE = "#e5c7a9"
 GRILLE_SOMBRE = "#675f54"
+ATTENUE_SOMBRE = "#968c83"  # --earth-muted
 
 PALETTE_SOMBRE = [
     "#c94234",
@@ -59,9 +60,11 @@ PALETTE_SOMBRE_24 = PALETTE_SOMBRE + [_assombrir(c, 0.4) for c in PALETTE_SOMBRE
 
 ECHELLE_SOMBRE = [FOND_SOMBRE, "#e06c57"]
 
+# Jaune et bleu Earthsong assombris : moins éclatants sur les tuiles sombres,
+# et le compte en blanc des clusters (dash_clientside.js) y gagne en contraste.
 ORG_COLORS_SOMBRE = {
-    "acheteur": "#f5ae2e",  # jaune Earthsong
-    "titulaire": "#1398b9",  # bleu Earthsong
+    "acheteur": _assombrir("#f5ae2e", 0.15),  # -> #d09427
+    "titulaire": _assombrir("#1398b9", 0.15),  # -> #10819d
 }
 
 
@@ -81,6 +84,12 @@ def appliquer_theme(fig: go.Figure, theme: str) -> go.Figure:
         paper_bgcolor=FOND_SOMBRE,
         plot_bgcolor=FOND_SOMBRE,
         font_color=TEXTE_SOMBRE,
+        # Barre d'outils : fond blanc translucide et icônes grises par défaut
+        modebar={
+            "bgcolor": "rgba(0,0,0,0)",
+            "color": ATTENUE_SOMBRE,
+            "activecolor": TEXTE_SOMBRE,
+        },
     )
     fig.update_xaxes(
         gridcolor=GRILLE_SOMBRE, linecolor=GRILLE_SOMBRE, zerolinecolor=GRILLE_SOMBRE

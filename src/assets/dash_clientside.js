@@ -56,6 +56,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
         weight: 1,
         opacity: 1,
         fillOpacity: 0.8,
+        className: "org-point",
       }).bindTooltip(feature.properties.tooltip);
     },
     clusterToLayer: function (feature, latlng, index, context) {

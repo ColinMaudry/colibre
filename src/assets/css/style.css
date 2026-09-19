@@ -1322,10 +1322,6 @@ input[type="number"] {
   cursor: grabbing;
 }
 
-.observatoire-card-draggable.dragging {
-  opacity: 0.4;
-}
-
 /* Bordure interne : un `border` sur la colonne Bootstrap décalerait la
    grille d'un cran pendant le survol. */
 .observatoire-card-draggable.drag-over > .card {
@@ -1405,9 +1401,10 @@ input[type="number"] {
      vaut déjà var(--primary-color) (:root plus haut dans ce fichier), qui
      est lui-même surchargé ci-dessus en var(--earth-primary), donc la
      cascade la met à jour automatiquement. --Dash-Fill-Inverse-Strong
-     (icône blanche sur fond Interactive-Strong) et --Dash-Shading-* (teinte
-     d'ombre) sont laissées telles quelles : ni fond/texte/bordure de
-     composant, ni assez contrastées pour justifier un cas particulier ici. */
+     n'est pas réservée aux icônes : Dash 4 s'en sert aussi comme fond des
+     dcc.Input et dcc.Dropdown (#fff par défaut), d'où sa redéfinition.
+     --Dash-Shading-* (teinte d'ombre) est laissée telle quelle. */
+  --Dash-Fill-Inverse-Strong: var(--earth-bg-2);
   --Dash-Fill-Disabled: var(--earth-bg-3);
   --Dash-Fill-Interactive-Weak: var(--earth-bg-2);
   --Dash-Fill-Primary-Hover: var(--earth-bg-2);
@@ -1438,6 +1435,11 @@ input[type="number"] {
   background-color: var(--earth-bg-2) !important;
 }
 
+/* Logo : beige Earthsong au lieu du noir de a.logo */
+[data-bs-theme="dark"] a.logo {
+  color: var(--earth-fg);
+}
+
 /* Alertes : fond sombre teinté, bordure et titre à la couleur Earthsong */
 [data-bs-theme="dark"] .alert-warning {
   --bs-alert-bg: #3a2f1c;
@@ -1464,6 +1466,33 @@ input[type="number"] {
 }
 [data-bs-theme="dark"] .leaflet-container {
   background: var(--earth-bg);
+}
+
+/* Contrôles Leaflet (zoom, attribution), blancs par défaut. Le CSS de
+   dash-leaflet est injecté à l'exécution, peut-être après ce fichier :
+   chaque sélecteur est strictement plus spécifique que celui de Leaflet. */
+[data-bs-theme="dark"] .leaflet-container .leaflet-bar {
+  border-color: var(--earth-border);
+}
+[data-bs-theme="dark"] .leaflet-bar a {
+  background-color: var(--earth-bg-2);
+  border-bottom-color: var(--earth-border);
+  color: var(--earth-fg);
+}
+[data-bs-theme="dark"] .leaflet-bar a:hover,
+[data-bs-theme="dark"] .leaflet-bar a:focus {
+  background-color: var(--earth-bg-3);
+}
+[data-bs-theme="dark"] .leaflet-bar a.leaflet-disabled {
+  background-color: var(--earth-bg-2);
+  color: var(--earth-muted);
+}
+[data-bs-theme="dark"] .leaflet-container .leaflet-control-attribution {
+  background: rgba(41, 37, 32, 0.8); /* --earth-bg à 80 %, comme Leaflet */
+  color: var(--earth-muted);
+}
+[data-bs-theme="dark"] .leaflet-control-attribution a {
+  color: var(--earth-link);
 }
 
 /* --- Inventaire (Step 4) : couleurs en dur du reste de style.css --- */
@@ -1682,6 +1711,23 @@ input[type="number"] {
 [data-bs-theme="dark"] .map-legend {
   background-color: rgba(41, 37, 32, 0.75);
   border-color: var(--earth-border);
+}
+
+/* Pastilles assombries (ORG_COLORS_SOMBRE) : bordure blanche, comme les
+   clusters, pour les détacher des tuiles et de la légende sombres.
+   En mode cluster, dash-leaflet écrase le style du circleMarker par un
+   défaut {weight: 1.5, color: "#222", opacity: 0.5} ; les propriétés CSS
+   l'emportent sur ces attributs SVG. */
+[data-bs-theme="dark"] .org-point {
+  stroke: white;
+  stroke-opacity: 1;
+  stroke-width: 1px;
+}
+[data-bs-theme="dark"] .map-legend-dot {
+  border: 1px solid white;
+  /* border-box (Bootstrap) : 12px pour garder 10px de couleur */
+  width: 12px;
+  height: 12px;
 }
 
 /* Surlignage temporaire de la ligne ciblée par une ancre /projet/donnees :

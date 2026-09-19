@@ -692,6 +692,9 @@ def test_appliquer_theme_sombre_pose_fond_police_et_grille():
     assert fig.layout.paper_bgcolor == FOND_SOMBRE
     assert fig.layout.plot_bgcolor == FOND_SOMBRE
     assert fig.layout.font.color == TEXTE_SOMBRE
+    # Barre d'outils : fond blanc translucide par défaut
+    assert fig.layout.modebar.bgcolor == "rgba(0,0,0,0)"
+    assert fig.layout.modebar.activecolor == TEXTE_SOMBRE
 
 
 def test_appliquer_theme_clair_laisse_le_rendu_inchange():
