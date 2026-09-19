@@ -1,21 +1,12 @@
 import dash_bootstrap_components as dbc
-from dash import (
-    Input,
-    Output,
-    State,
-    callback,
-    ctx,
-    dash_table,
-    html,
-    no_update,
-    register_page,
-)
+from dash import Input, Output, callback, ctx, html, no_update, register_page
 from dash.exceptions import PreventUpdate
 from flask_login import current_user
 
 from src.admin.db import log_action
 from src.admin.guard import is_admin
-from src.admin.tables import all_tables, find_changed_cell, get_rows, set_cell
+from src.admin.tables import all_tables, get_rows, set_cell
+from src.figures import client_grid
 from src.pages.admin._shell import not_admin
 
 register_page(
@@ -29,25 +20,22 @@ register_page(
 DEFAULT_TABLE = "users"
 
 
-def _columns_for(table: str):
+def _columns_for(table: str) -> list[dict]:
     cfg = all_tables()[table]
-    return [
-        {
-            "name": col,
-            "id": col,
+    defs = []
+    for col in cfg.columns:
+        col_def = {
+            "field": col,
+            "headerName": col,
             "editable": col in cfg.editable_columns,
-            **({"presentation": "dropdown"} if col in cfg.dropdowns else {}),
         }
-        for col in cfg.columns
-    ]
-
-
-def _dropdown_for(table: str):
-    cfg = all_tables()[table]
-    return {
-        col: {"options": [{"label": v, "value": v} for v in values]}
-        for col, values in cfg.dropdowns.items()
-    }
+        if col in cfg.dropdowns:
+            col_def |= {
+                "cellEditor": "agSelectCellEditor",
+                "cellEditorParams": {"values": list(cfg.dropdowns[col])},
+            }
+        defs.append(col_def)
+    return defs
 
 
 def layout(**_):
@@ -64,16 +52,18 @@ def layout(**_):
                 className="mb-3",
                 style={"maxWidth": "300px"},
             ),
-            dash_table.DataTable(
-                id="admin-table",
-                columns=_columns_for(DEFAULT_TABLE),
-                data=get_rows(DEFAULT_TABLE),
-                dropdown=_dropdown_for(DEFAULT_TABLE),
-                editable=True,
-                filter_action="native",
-                sort_action="native",
-                page_action="native",
+            client_grid(
+                "admin-table",
+                _columns_for(DEFAULT_TABLE),
+                get_rows(DEFAULT_TABLE),
                 page_size=20,
+                defaultColDef={
+                    "sortable": True,
+                    "filter": True,
+                    "floatingFilter": True,
+                    "resizable": True,
+                    "minWidth": 120,
+                },
             ),
         ],
         fluid=True,
@@ -82,16 +72,14 @@ def layout(**_):
 
 
 @callback(
-    Output("admin-table", "data"),
-    Output("admin-table", "columns"),
-    Output("admin-table", "dropdown"),
+    Output("admin-table", "rowData"),
+    Output("admin-table", "columnDefs"),
     Output("admin-alerts", "children"),
     Input("admin-table-select", "value"),
-    Input("admin-table", "data"),
-    State("admin-table", "data_previous"),
+    Input("admin-table", "cellValueChanged"),
     prevent_initial_call=True,
 )
-def _update_table(selected_table, data, data_previous):
+def _update_table(selected_table, cell_changes):
     # Les callbacks Dash sont des endpoints serveur globaux (/_dash-update-component)
     # invocables indépendamment du layout rendu : la garde is_admin() de layout()
     # ne protège QUE l'affichage. Sans ce contrôle, n'importe qui (y compris un
@@ -100,39 +88,34 @@ def _update_table(selected_table, data, data_previous):
         raise PreventUpdate
 
     if ctx.triggered_id == "admin-table-select":
+        return get_rows(selected_table), _columns_for(selected_table), None
+
+    if not cell_changes:
+        return no_update, no_update, None
+    change = cell_changes[-1]
+    column, old_value, new_value = change["colId"], change["oldValue"], change["value"]
+    if old_value == new_value:
+        return no_update, no_update, None
+
+    cfg = all_tables()[selected_table]
+    row = change["data"]
+    try:
+        set_cell(selected_table, row[cfg.pk], column, new_value)
+    except ValueError as exc:
+        # La cellule affiche encore la valeur refusée : on relit la base.
         return (
             get_rows(selected_table),
-            _columns_for(selected_table),
-            _dropdown_for(selected_table),
-            None,
-        )
-
-    change = find_changed_cell(data, data_previous)
-    if change is None:
-        return no_update, no_update, no_update, None
-
-    row_index, column, old_value, new_value = change
-    cfg = all_tables()[selected_table]
-    pk_value = data[row_index][cfg.pk]
-    try:
-        set_cell(selected_table, pk_value, column, new_value)
-    except ValueError as exc:
-        return (
-            no_update,
-            no_update,
             no_update,
             dbc.Alert(str(exc), color="danger", dismissable=True),
         )
 
-    target_user_id = cfg.target_user_id(data[row_index])
     log_action(
         current_user.email,
         f"edit_{selected_table}",
-        target_user_id,
+        cfg.target_user_id(row),
         f"{column}: {old_value!r} → {new_value!r}",
     )
     return (
-        no_update,
         no_update,
         no_update,
         dbc.Alert("Modification enregistrée.", color="success", dismissable=True),
