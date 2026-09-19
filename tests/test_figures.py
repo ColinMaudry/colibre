@@ -441,6 +441,94 @@ def test_ag_grid_defaults_unchanged_for_tableau():
     assert grid.persistence is True
 
 
+# --- client_grid() : fabrique commune des grilles AG Grid client-side ------
+
+
+def test_client_grid_returns_grid_with_id_columndefs_rowdata():
+    from src.figures import client_grid
+
+    column_defs = [{"field": "nom"}]
+    row_data = [{"nom": "Org 1"}]
+    grid = client_grid("mon_id", column_defs, row_data)
+
+    import dash_ag_grid as dag
+
+    assert isinstance(grid, dag.AgGrid)
+    assert grid.id == "mon_id"
+    assert grid.columnDefs == column_defs
+    assert grid.rowData == row_data
+
+
+def test_client_grid_sets_theme_locale_layout_and_persistence():
+    from src.figures import AG_GRID_LOCALE_FR, AG_GRID_THEME, client_grid
+
+    grid = client_grid("mon_id", [], [])
+    options = grid.dashGridOptions
+
+    assert options["theme"] == AG_GRID_THEME
+    assert options["localeText"] == AG_GRID_LOCALE_FR
+    assert options["domLayout"] == "autoHeight"
+    assert options["suppressCellFocus"] is True
+    assert grid.dangerously_allow_code is True
+    assert grid.persistence is False
+
+
+def test_client_grid_without_page_size_has_no_pagination():
+    from src.figures import client_grid
+
+    grid = client_grid("mon_id", [], [])
+
+    assert "pagination" not in grid.dashGridOptions
+    assert "paginationPageSize" not in grid.dashGridOptions
+
+
+def test_client_grid_with_page_size_enables_pagination():
+    from src.figures import client_grid
+
+    grid = client_grid("mon_id", [], [], page_size=10)
+
+    assert grid.dashGridOptions["pagination"] is True
+    assert grid.dashGridOptions["paginationPageSize"] == 10
+
+
+def test_client_grid_merges_dash_grid_options_and_can_override():
+    from src.figures import client_grid
+
+    grid = client_grid(
+        "mon_id",
+        [],
+        [],
+        dash_grid_options={
+            "domLayout": "normal",
+            "enableCellTextSelection": True,
+        },
+    )
+    options = grid.dashGridOptions
+
+    # surcharge une valeur commune...
+    assert options["domLayout"] == "normal"
+    # ...sans faire disparaître les autres options par défaut
+    assert options["suppressCellFocus"] is True
+    # ...et ajoute la nouvelle option fusionnée
+    assert options["enableCellTextSelection"] is True
+
+
+def test_client_grid_passes_through_extra_ag_grid_kwargs():
+    from src.figures import client_grid
+
+    default_col_def = {"resizable": True}
+    grid = client_grid(
+        "mon_id",
+        [],
+        [],
+        defaultColDef=default_col_def,
+        getRowId="params.data.uid",
+    )
+
+    assert grid.defaultColDef == default_col_def
+    assert grid.getRowId == "params.data.uid"
+
+
 def test_get_top_org_ag_grid_returns_grid_with_rowdata():
     """Le top 10 devient une AG Grid client-side (rowData directe, pas de
     getRowsRequest server-side)."""
@@ -554,6 +642,38 @@ def test_get_top_org_table_limit_above_row_count_is_harmless():
         _fake_marches(7, "acheteur"), "acheteur", [], filters=False
     )
     assert len(table.data) == 7
+
+
+def test_get_top_org_ag_grid_truncates_to_limit():
+    """Même troncature que get_top_org_table, mais sur grid.rowData."""
+    from src.figures import get_top_org_ag_grid
+
+    lff = _fake_marches(120)
+    complet = get_top_org_ag_grid(lff, "titulaire", [], filters=False, limit=None)
+    tronque = get_top_org_ag_grid(lff, "titulaire", [], filters=False, limit=100)
+
+    assert len(complet.rowData) == 120
+    assert len(tronque.rowData) == 100
+    # l'agrégat est trié par Attributions décroissant : on garde bien la tête
+    # du classement, pas 100 lignes au hasard
+    gardes = {row["titulaire_nom_tooltip"] for row in tronque.rowData}
+    assert gardes == {f"Org {i}" for i in range(100)}
+
+
+def test_get_top_org_ag_grid_defaults_to_100_rows():
+    from src.figures import get_top_org_ag_grid
+
+    grid = get_top_org_ag_grid(_fake_marches(120), "titulaire", [], filters=False)
+    assert len(grid.rowData) == 100
+
+
+def test_get_top_org_ag_grid_limit_above_row_count_is_harmless():
+    from src.figures import get_top_org_ag_grid
+
+    grid = get_top_org_ag_grid(
+        _fake_marches(7, "acheteur"), "acheteur", [], filters=False
+    )
+    assert len(grid.rowData) == 7
 
 
 # --- Ordre des cards de l'observatoire (issue #107) ---------------------------

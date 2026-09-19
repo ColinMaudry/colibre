@@ -1226,9 +1226,9 @@ def make_schema_grid():
     dans la colonne « Nom » existent réellement dans le DOM (lien direct,
     Ctrl+F) et le défilement reste celui de la page, sans scroll interne.
     """
-    return dag.AgGrid(
-        id="schema_champs_grid",
-        columnDefs=[
+    return client_grid(
+        "schema_champs_grid",
+        [
             {
                 "field": "nom",
                 "headerName": "Nom",
@@ -1258,24 +1258,13 @@ def make_schema_grid():
                 "minWidth": 320,
             },
         ],
-        rowData=schema_field_rows(),
-        # rend le <span id=...> d'ancre et le gras de la colonne « Nom »
-        dangerously_allow_code=True,
+        schema_field_rows(),
+        dash_grid_options={"enableCellTextSelection": True, "ensureDomOrder": True},
         defaultColDef={
             "resizable": True,
             "sortable": False,
             "floatingFilter": True,
         },
-        dashGridOptions={
-            "domLayout": "autoHeight",
-            "suppressCellFocus": True,
-            "enableCellTextSelection": True,
-            "ensureDomOrder": True,
-            "localeText": AG_GRID_LOCALE_FR,
-            "theme": AG_GRID_THEME,
-        },
-        style={"width": "100%"},
-        persistence=False,
     )
 
 
@@ -1354,15 +1343,31 @@ def get_top_org_table(
     )
 
 
-def get_top_org_ag_grid(data, org_type: str, extra_columns: list, filters: bool = True):
+def get_top_org_ag_grid(
+    data,
+    org_type: str,
+    extra_columns: list,
+    filters: bool = True,
+    limit: int | None = 100,
+):
     """Top N acheteurs/titulaires en AG Grid client-side (rowData directe).
 
     Remplace get_top_org_table (dash_table) : même agrégation (helper partagé),
     rendu AG Grid (thème brique, liens markdown). html.Div() si vide/erreur.
+
+    La pagination d'AG Grid en mode client-side est côté client : toutes les
+    lignes passées à `rowData` transitent par le navigateur, même si seules
+    `page_size` sont visibles. Sans `limit`, l'observatoire expédierait ainsi
+    82 934 titulaires (33,6 Mo de JSON) pour en afficher 10. L'agrégat étant
+    déjà trié par nombre d'attributions décroissant, tronquer conserve bien
+    les mieux classés. `limit=None` restaure l'envoi intégral.
     """
     dff = _top_org_aggregate(data, org_type, extra_columns)
     if dff is None:
         return html.Div()
+
+    if limit is not None:
+        dff = dff.head(limit)
 
     dff = add_links(dff)
 
@@ -1386,25 +1391,12 @@ def get_top_org_ag_grid(data, org_type: str, extra_columns: list, filters: bool 
             col_def["flex"] = 1
         column_defs.append(col_def)
 
-    # ag_grid() du Lot 1 est server-side (rowModelType="infinite", pas de
-    # rowData) : inadapté au top 10, qui est client-side. On construit donc une
-    # AG Grid client-side directe, en réutilisant le thème + localeText.
-    return dag.AgGrid(
-        id=f"top10_{org_type}",
-        columnDefs=column_defs,
-        rowData=dff.to_dicts(),
-        dangerously_allow_code=True,  # rend le HTML <a> des cellules liens
+    return client_grid(
+        f"top10_{org_type}",
+        column_defs,
+        dff.to_dicts(),
+        page_size=10,
         columnSize="responsiveSizeToFit",
-        dashGridOptions={
-            "domLayout": "autoHeight",  # OK ici : row model client-side
-            "pagination": True,
-            "paginationPageSize": 10,
-            "suppressCellFocus": True,
-            "localeText": AG_GRID_LOCALE_FR,
-            "theme": AG_GRID_THEME,
-        },
-        style={"width": "100%"},
-        persistence=False,
     )
 
 
@@ -1462,6 +1454,42 @@ AG_GRID_LOCALE_FR = {
     "noRowsToShow": "Aucune ligne à afficher",
     "loadingOoo": "Chargement...",
 }
+
+
+def client_grid(
+    grid_id,
+    column_defs,
+    row_data,
+    *,
+    page_size=None,
+    dash_grid_options=None,
+    **ag_grid_kwargs,
+):
+    """Grille AG Grid client-side (rowData directe) au thème du site.
+
+    Pendant de ag_grid(), réservée au modèle `infinite` de /tableau et des
+    fiches. Le mode sombre suit via les variables --ag-* redéfinies sous
+    [data-bs-theme="dark"] (style.css).
+    """
+    options = {
+        "domLayout": "autoHeight",  # row model client-side : OK
+        "suppressCellFocus": True,
+        "localeText": AG_GRID_LOCALE_FR,
+        "theme": AG_GRID_THEME,
+    }
+    if page_size:
+        options |= {"pagination": True, "paginationPageSize": page_size}
+    options |= dash_grid_options or {}
+    return dag.AgGrid(
+        id=grid_id,
+        columnDefs=column_defs,
+        rowData=row_data,
+        dangerously_allow_code=True,  # rend le HTML <a> des cellules liens
+        dashGridOptions=options,
+        style={"width": "100%"},
+        persistence=False,
+        **ag_grid_kwargs,
+    )
 
 
 def ag_grid(
