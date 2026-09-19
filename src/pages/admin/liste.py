@@ -57,7 +57,16 @@ def layout(**_):
                 _columns_for(DEFAULT_TABLE),
                 get_rows(DEFAULT_TABLE),
                 page_size=20,
+                dash_grid_options={
+                    "suppressCellFocus": False,
+                    "singleClickEdit": True,
+                    "stopEditingWhenCellsLoseFocus": True,
+                },
                 defaultColDef={
+                    # Sans ça, AG Grid 35 infère number/dateString depuis rowData
+                    # (select "0"/"1" affiché « Invalid Number », saisie invalide
+                    # changée en null) : validation et cast restent au serveur.
+                    "cellDataType": False,
                     "sortable": True,
                     "filter": True,
                     "floatingFilter": True,
@@ -92,13 +101,19 @@ def _update_table(selected_table, cell_changes):
 
     if not cell_changes:
         return no_update, no_update, None
+    # AG Grid Community : un seul changement par édition, le dernier suffit.
     change = cell_changes[-1]
     column, old_value, new_value = change["colId"], change["oldValue"], change["value"]
-    if old_value == new_value:
-        return no_update, no_update, None
-
     cfg = all_tables()[selected_table]
     row = change["data"]
+    # Événement tardif de l'ancienne table, arrivé après un changement de
+    # sélection : ni KeyError ni écriture dans la mauvaise table.
+    if column not in cfg.columns or cfg.pk not in row:
+        return no_update, no_update, None
+    # SQLite renvoie 1, le select renvoie "1" : même valeur.
+    if str(old_value) == str(new_value):
+        return no_update, no_update, None
+
     try:
         set_cell(selected_table, row[cfg.pk], column, new_value)
     except ValueError as exc:

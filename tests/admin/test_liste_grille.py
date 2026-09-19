@@ -109,7 +109,12 @@ def test_update_table_valid_edit_calls_set_cell_and_log_action(
         row_data, column_defs, alert = liste._update_table("users", cell_changes)
 
     set_cell_mock.assert_called_once_with("users", uid, "siret", "12345678900011")
-    log_action_mock.assert_called_once()
+    log_action_mock.assert_called_once_with(
+        "admin@ex.fr",
+        "edit_users",
+        uid,
+        "siret: None → '12345678900011'",
+    )
     assert row_data is no_update
     assert column_defs is no_update
     assert alert.color == "success"
@@ -150,3 +155,114 @@ def test_update_table_rejected_edit_reverts_rowdata_from_db(users_db_path, monke
     assert row_data == get_rows("users")
     sirets = {row["id"]: row["siret"] for row in row_data}
     assert sirets[uid] == "ANCIEN"
+
+
+def test_layout_admin_grid_disables_celldatatype_and_enables_click_edit(
+    users_db_path, monkeypatch
+):
+    """AG Grid 35 infère sinon number/dateString depuis rowData : le select
+    email_verified ("0"/"1") afficherait « Invalid Number ». Validation et cast
+    restent côté serveur (_coerce_value). Édition en un clic, validée à la
+    perte de focus."""
+    import src.app  # noqa: F401 — register_page() exige une app instanciée
+    from src.pages.admin import liste
+
+    monkeypatch.setattr(liste, "is_admin", lambda: True)
+
+    grid = _find_grid(liste.layout(), "admin-table")
+
+    assert isinstance(grid, dag.AgGrid)
+    assert grid.defaultColDef["cellDataType"] is False
+    assert grid.defaultColDef["sortable"] is True
+    assert grid.dashGridOptions["suppressCellFocus"] is False
+    assert grid.dashGridOptions["singleClickEdit"] is True
+    assert grid.dashGridOptions["stopEditingWhenCellsLoseFocus"] is True
+
+
+def test_update_table_same_value_as_string_is_not_a_change(users_db_path, monkeypatch):
+    """oldValue=1 (int venu de SQLite) et value="1" (select) : pas de changement."""
+    from src.pages.admin import liste
+
+    monkeypatch.setattr(liste, "is_admin", lambda: True)
+    monkeypatch.setattr(liste, "ctx", _fake_ctx("admin-table"))
+    set_cell_mock = Mock()
+    log_action_mock = Mock()
+    monkeypatch.setattr(liste, "set_cell", set_cell_mock)
+    monkeypatch.setattr(liste, "log_action", log_action_mock)
+
+    cell_changes = [
+        {
+            "rowIndex": 0,
+            "rowId": "7",
+            "colId": "email_verified",
+            "oldValue": 1,
+            "value": "1",
+            "data": {"id": 7, "email": "a@ex.fr", "email_verified": "1"},
+        }
+    ]
+
+    result = liste._update_table("users", cell_changes)
+
+    assert result == (no_update, no_update, None)
+    set_cell_mock.assert_not_called()
+    log_action_mock.assert_not_called()
+
+    # Contrôle positif : une vraie modification passe bien par set_cell.
+    cell_changes[0]["value"] = "0"
+    admin_user = type("U", (), {"email": "admin@ex.fr"})()
+    with patch.object(liste, "current_user", admin_user):
+        liste._update_table("users", cell_changes)
+    set_cell_mock.assert_called_once_with("users", 7, "email_verified", "0")
+
+
+def test_update_table_ignores_late_event_from_previous_table(
+    users_db_path, monkeypatch
+):
+    """Un cellValueChanged tardif de l'ancienne table (subscriptions) arrivé
+    après la bascule sur users ne doit ni lever KeyError ni écrire."""
+    from src.pages.admin import liste
+
+    monkeypatch.setattr(liste, "is_admin", lambda: True)
+    monkeypatch.setattr(liste, "ctx", _fake_ctx("admin-table"))
+    set_cell_mock = Mock()
+    log_action_mock = Mock()
+    monkeypatch.setattr(liste, "set_cell", set_cell_mock)
+    monkeypatch.setattr(liste, "log_action", log_action_mock)
+
+    stale_change = {
+        "rowIndex": 0,
+        "rowId": "3",
+        "colId": "prix_ht",
+        "oldValue": 20.0,
+        "value": 30.0,
+        "data": {"id": 3, "user_id": 5, "prix_ht": 30.0},
+    }
+    # Colonne absente de la table sélectionnée.
+    assert liste._update_table("users", [stale_change]) == (
+        no_update,
+        no_update,
+        None,
+    )
+    # Clé primaire absente de la ligne (subscriber_state a pk user_id… mais
+    # une ligne users n'a pas de user_id).
+    users_row_change = {
+        "rowIndex": 0,
+        "rowId": "5",
+        "colId": "votes_balance",
+        "oldValue": 1,
+        "value": 2,
+        "data": {"id": 5, "email": "a@ex.fr", "votes_balance": 2},
+    }
+    assert liste._update_table("subscriber_state", [users_row_change]) == (
+        no_update,
+        no_update,
+        None,
+    )
+    set_cell_mock.assert_not_called()
+    log_action_mock.assert_not_called()
+
+    # Contrôle positif : la même modification sur la bonne table est écrite.
+    admin_user = type("U", (), {"email": "admin@ex.fr"})()
+    with patch.object(liste, "current_user", admin_user):
+        liste._update_table("subscriptions", [stale_change])
+    set_cell_mock.assert_called_once_with("subscriptions", 3, "prix_ht", 30.0)
