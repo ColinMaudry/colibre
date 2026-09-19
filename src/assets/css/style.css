@@ -1334,6 +1334,16 @@ input[type="number"] {
   cursor: pointer;
 }
 
+/* Sans libellé, la gouttière de .form-switch (padding-left 2.5em, case
+   ramenée par margin-left -2.5em) laisse 0.5em à droite de la case et la
+   décentre entre le soleil et la lune. */
+.theme-switch.form-switch {
+  padding-left: 0;
+}
+.theme-switch.form-switch .form-check-input {
+  margin-left: 0;
+}
+
 /* ==========================================================================
    Mode sombre (#118) — palette Earthsong
    Posé côté serveur sur <html data-bs-theme="dark"> pour les abonné·es.
