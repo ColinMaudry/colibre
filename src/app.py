@@ -707,6 +707,15 @@ def _enregistrer_theme(sombre):
     if not current_user.is_authenticated or not current_user_has_subscription():
         raise PreventUpdate
     theme = SOMBRE if sombre else CLAIR
+    # `_auth_nav` reconstruit le switch (avec sa `value` courante) à chaque
+    # changement de page : Dash déclenche alors ce callback sur ce composant
+    # nouvellement monté, sans clic, même avec `prevent_initial_call=True`
+    # (qui ne couvre que le tout premier chargement de l'app, pas la
+    # remonte ultérieure d'un composant #118). Sans ce garde-fou, chaque
+    # page réenregistrerait la même valeur et redéclencherait le
+    # rechargement côté client — boucle infinie.
+    if theme == get_theme(current_user.id):
+        raise PreventUpdate
     save_theme(current_user.id, theme)
     return theme
 

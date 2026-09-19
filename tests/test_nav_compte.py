@@ -169,8 +169,11 @@ def test_switch_theme_place_avant_le_separateur(monkeypatch):
 
 
 def test_enregistrer_theme_sombre_pour_un_abonne(monkeypatch):
+    """Cas positif (ancre) : la valeur reçue diffère du thème enregistré, donc
+    le nouveau garde-fou de #118 ne doit pas empêcher la sauvegarde."""
     monkeypatch.setattr(app_module, "current_user", _fake_user(True, user_id=42))
     monkeypatch.setattr(shell, "current_user_has_subscription", lambda: True)
+    monkeypatch.setattr(app_module, "get_theme", lambda user_id: CLAIR)
     appels = []
     monkeypatch.setattr(
         app_module,
@@ -183,8 +186,11 @@ def test_enregistrer_theme_sombre_pour_un_abonne(monkeypatch):
 
 
 def test_enregistrer_theme_clair_pour_un_abonne(monkeypatch):
+    """Cas positif (ancre) : la valeur reçue diffère du thème enregistré, donc
+    le nouveau garde-fou de #118 ne doit pas empêcher la sauvegarde."""
     monkeypatch.setattr(app_module, "current_user", _fake_user(True, user_id=42))
     monkeypatch.setattr(shell, "current_user_has_subscription", lambda: True)
+    monkeypatch.setattr(app_module, "get_theme", lambda user_id: SOMBRE)
     appels = []
     monkeypatch.setattr(
         app_module,
@@ -202,6 +208,31 @@ def test_enregistrer_theme_non_abonne_ne_sauvegarde_pas_et_previent(monkeypatch)
     sauvegarder ni recharger la page."""
     monkeypatch.setattr(app_module, "current_user", _fake_user(True, user_id=42))
     monkeypatch.setattr(shell, "current_user_has_subscription", lambda: False)
+    appels = []
+    monkeypatch.setattr(
+        app_module,
+        "save_theme",
+        lambda user_id, theme: appels.append((user_id, theme)),
+    )
+    with pytest.raises(PreventUpdate):
+        app_module._enregistrer_theme(True)
+    assert appels == []
+
+
+def test_enregistrer_theme_valeur_inchangee_previent_sans_sauvegarder(monkeypatch):
+    """Bug #118 : `_auth_nav` remonte `dbc.Switch(value=get_theme(...))` à
+    chaque re-rendu du menu (changement de page), et Dash déclenche le
+    callback lié à un composant nouvellement inséré même sans clic, malgré
+    `prevent_initial_call=True` (celui-ci ne couvre que le tout premier
+    chargement de l'app, pas la (re)monte ultérieure d'un composant). Sans
+    garde-fou, chaque changement de page réécrit la même valeur en base et
+    déclenche le rechargement côté client (boucle infinie).
+
+    Ici la valeur reçue égale le thème déjà enregistré : rien à sauvegarder,
+    donc `PreventUpdate` doit être levée avant tout appel à `save_theme`."""
+    monkeypatch.setattr(app_module, "current_user", _fake_user(True, user_id=42))
+    monkeypatch.setattr(shell, "current_user_has_subscription", lambda: True)
+    monkeypatch.setattr(app_module, "get_theme", lambda user_id: SOMBRE)
     appels = []
     monkeypatch.setattr(
         app_module,
