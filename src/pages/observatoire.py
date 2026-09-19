@@ -881,6 +881,10 @@ def update_hidden_columns_from_checkboxes(selected_rows, current_hidden):
     ),
 )
 def store_hidden_columns(hidden_columns):
+    # None = pas encore de préférence : on masque le défaut, celui que la
+    # modale décoche (update_checkboxes_from_hidden_columns). [] = tout afficher.
+    if hidden_columns is None:
+        return get_default_hidden_columns("tableau")
     return hidden_columns
 
 

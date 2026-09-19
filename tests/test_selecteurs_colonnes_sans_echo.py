@@ -140,3 +140,19 @@ def test_selection_differente_ecrit_la_nouvelle_liste(module, page):
     assert cb([], [COLUMNS[1]]) == COLUMNS
     # Tout cocher depuis un store non vide : plus rien de masqué.
     assert cb(_lignes_cochees([]), [COLUMNS[1]]) == []
+
+
+def test_apercu_observatoire_sans_preference_masque_le_defaut():
+    """Store à None (première visite) : l'aperçu doit masquer les mêmes colonnes
+    que celles que la modale décoche, soit le défaut « tableau ». Sinon il
+    affiche tout, et le premier décochage le fait sauter à « défaut moins une »."""
+    from src.utils.table import COLUMNS, get_default_hidden_columns
+
+    store_hidden_columns = _module("observatoire").store_hidden_columns
+    defaut = get_default_hidden_columns("tableau")
+    assert defaut, "défaut vide : rien ne serait testé"
+
+    assert store_hidden_columns(None) == defaut
+    # [] est un choix explicite : tout afficher.
+    assert store_hidden_columns([]) == []
+    assert store_hidden_columns([COLUMNS[2]]) == [COLUMNS[2]]
