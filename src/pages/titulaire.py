@@ -26,9 +26,10 @@ from src.utils.entity_grid import entity_scope, register_entity_grid_callbacks
 from src.utils.frontend import DROPDOWN_LABELS_FR, get_button_properties
 from src.utils.seo import META_CONTENT, make_org_jsonld
 from src.utils.table import (
-    COLUMNS,
     format_number,
     get_default_hidden_columns,
+    hidden_columns_from_selection,
+    selection_from_hidden_columns,
     write_styled_excel,
 )
 from src.utils.tracking import track_download
@@ -472,20 +473,27 @@ def download_titulaire_data(
 
 @callback(
     Output("titulaire-hidden-columns", "data", allow_duplicate=True),
-    Input("titulaire_column_list", "selected_rows"),
+    Input("titulaire_column_list", "selectedRows"),
+    State("titulaire-hidden-columns", "data"),
     prevent_initial_call=True,
 )
-def update_hidden_columns_from_checkboxes(selected_columns):
-    if selected_columns:
-        selected_columns = [COLUMNS[i] for i in selected_columns]
-        hidden_columns = [col for col in COLUMNS if col not in selected_columns]
-        return hidden_columns
-    else:
-        return []
+def update_hidden_columns_from_checkboxes(selected_rows, current_hidden):
+    hidden = hidden_columns_from_selection(selected_rows)
+    # Garde anti-écho (#139, #141) : poser selectedRows depuis le serveur à
+    # l'ouverture de la modale fait réémettre selectedRows par AG Grid. Si
+    # l'état calculé est déjà celui du store, ne rien réécrire.
+    reference = (
+        current_hidden
+        if current_hidden is not None
+        else get_default_hidden_columns("titulaire")
+    )
+    if set(hidden) == set(reference):
+        return no_update
+    return hidden
 
 
 @callback(
-    Output("titulaire_column_list", "selected_rows"),
+    Output("titulaire_column_list", "selectedRows"),
     Input("titulaire_columns", "is_open"),
     State("titulaire-hidden-columns", "data"),
 )
@@ -502,11 +510,14 @@ def update_checkboxes_from_hidden_columns(is_open, hidden_cols):
     if not is_open:
         return no_update
 
-    hidden_cols = hidden_cols or get_default_hidden_columns("titulaire")
+    # None = pas encore de préférence ; [] = choix explicite de tout
+    # afficher, à respecter tel quel (même distinction que la garde de
+    # update_hidden_columns_from_checkboxes).
+    if hidden_cols is None:
+        hidden_cols = get_default_hidden_columns("titulaire")
 
-    # Show all columns that are NOT hidden
-    visible_cols = [COLUMNS.index(col) for col in COLUMNS if col not in hidden_cols]
-    return visible_cols
+    # Coche toutes les colonnes qui ne sont PAS masquées
+    return selection_from_hidden_columns(hidden_cols)
 
 
 @callback(

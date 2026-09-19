@@ -33,7 +33,7 @@ def test_ouvrir_la_modale_coche_les_colonnes_affichees(
     )
     time.sleep(0.5)
     cible.click()
-    selecteur = f"#{cases} input[type='checkbox']"
+    selecteur = f"#{cases} .ag-row .ag-selection-checkbox input"
     dash_duo.wait_for_element(selecteur, timeout=8)
     time.sleep(1)
 
@@ -56,7 +56,7 @@ def test_observatoire_ouvrir_la_modale_coche_les_colonnes(dash_duo: DashComposit
     dash_duo.driver.find_element(By.ID, "btn-observatoire-preview").click()
     dash_duo.wait_for_element("#observatoire-preview-columns-open", timeout=10)
     dash_duo.driver.find_element(By.ID, "observatoire-preview-columns-open").click()
-    selecteur = "#observatoire_preview_column_list input[type='checkbox']"
+    selecteur = "#observatoire_preview_column_list .ag-row .ag-selection-checkbox input"
     dash_duo.wait_for_element(selecteur, timeout=8)
     time.sleep(1)
 

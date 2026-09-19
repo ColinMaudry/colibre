@@ -10,7 +10,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import polars as pl
-from dash import dash_table, dcc, html
+from dash import MATCH, Input, State, clientside_callback, dash_table, dcc, html
 from dash_extensions.javascript import Namespace
 from polars.exceptions import ColumnNotFoundError
 
@@ -1136,50 +1136,74 @@ def make_donut(
 
 
 def make_column_picker(page: str):
-    table_data = []
-    for col in schema.names():
-        column_data_schema = DATA_SCHEMA[col]
-        column_data = {
-            "id": col,
-            "name": column_data_schema["title"],
-            "description": column_data_schema["description"],
-        }
-        table_data.append(column_data)
+    """Sélecteur de colonnes (modale « Colonnes ») : une grille AG Grid dont
+    chaque ligne est une colonne du jeu de données, cochée si elle est affichée.
 
-    table = (
-        DataTable(
-            row_selectable="multi",
-            data=table_data,
-            filter_action="native",
-            sort_action="none",
-            style_cell={
-                "textAlign": "left",
-            },
-            columns=[
-                {
-                    "name": "Nom",
-                    "id": "name",
+    Les lignes ont pour id le nom de la colonne (`getRowId`), ce qui permet de
+    poser `selectedRows = {"ids": [...]}` depuis le serveur à l'ouverture de la
+    modale (cf. selection_from_hidden_columns).
+    """
+    rows = [
+        {
+            "id": col,
+            "name": DATA_SCHEMA[col]["title"],
+            "description": DATA_SCHEMA[col]["description"],
+        }
+        for col in schema.names()
+    ]
+    return html.Div(
+        [
+            dbc.Input(
+                id={"type": "column-search", "page": page},
+                type="search",
+                placeholder="Rechercher une colonne…",
+                className="mb-2",
+                debounce=False,
+            ),
+            client_grid(
+                f"{page}_column_list",
+                [
+                    {"field": "name", "headerName": "Nom", "flex": 1, "minWidth": 200},
+                    {
+                        "field": "description",
+                        "headerName": "Description",
+                        "flex": 2,
+                        "minWidth": 300,
+                        "wrapText": True,
+                        "autoHeight": True,
+                    },
+                ],
+                rows,
+                dash_grid_options={
+                    "rowSelection": {
+                        "mode": "multiRow",
+                        "checkboxes": True,
+                        "headerCheckbox": True,
+                        "selectAll": "filtered",
+                        "enableClickSelection": True,
+                    },
                 },
-                {
-                    "name": "Description",
-                    "id": "description",
-                },
-            ],
-            style_cell_conditional=[
-                {
-                    "if": {"column_id": "description"},
-                    "minWidth": "450px",
-                    "overflow": "hidden",
-                    "lineHeight": "18px",
-                    "whiteSpace": "normal",
-                }
-            ],
-            page_action="none",
-            dtid=f"{page}_column_list",
-        ),
+                getRowId="params.data.id",
+                defaultColDef={"sortable": False, "filter": False},
+            ),
+        ]
     )
 
-    return table
+
+# Filtre rapide du sélecteur de colonnes : un seul callback pour toutes les
+# pages (MATCH sur la page), qui passe le texte saisi au quickFilterText de la
+# grille correspondante.
+clientside_callback(
+    """
+    function (value, id) {
+        const api = dash_ag_grid.getApi(id.page + "_column_list");
+        if (api) { api.setGridOption("quickFilterText", value || ""); }
+    }
+    """,
+    Input({"type": "column-search", "page": MATCH}, "value"),
+    State({"type": "column-search", "page": MATCH}, "id"),
+    prevent_initial_call=True,
+)
 
 
 def make_schema_grid():

@@ -23,7 +23,7 @@ def tableau():
 
 
 def _declaration_du_callback_des_cases() -> str:
-    """Le bloc @callback qui produit `tableau_column_list.selected_rows`.
+    """Le bloc @callback qui produit `tableau_column_list.selectedRows`.
 
     Lu dans la source plutôt que dans `dash._callback.GLOBAL_CALLBACK_MAP` :
     cette table est un état global partagé par toute la session de test, et
@@ -34,7 +34,7 @@ def _declaration_du_callback_des_cases() -> str:
 
     source = Path("src/pages/tableau.py").read_text()
     debut = source.rindex(
-        "@callback", 0, source.index('Output("tableau_column_list", "selected_rows")')
+        "@callback", 0, source.index('Output("tableau_column_list", "selectedRows")')
     )
     fin = source.index("def ", debut)
     return source[debut:fin]
@@ -55,7 +55,7 @@ def test_les_cases_sont_alimentees_par_louverture_de_la_modale():
 
 def test_modale_fermee_naecrit_rien(tableau):
     """Le callback part aussi à la fermeture : il ne doit alors rien écrire,
-    sinon on réintroduit une écriture non sollicitée de `selected_rows`."""
+    sinon on réintroduit une écriture non sollicitée de `selectedRows`."""
     assert (
         tableau.update_checkboxes_from_hidden_columns(False, ["montant"]) is no_update
     )
@@ -66,7 +66,8 @@ def test_modale_ouverte_coche_les_colonnes_visibles(tableau):
 
     coches = tableau.update_checkboxes_from_hidden_columns(True, ["montant"])
 
-    assert coches == [COLUMNS.index(c) for c in COLUMNS if c != "montant"]
+    assert coches == {"ids": [c for c in COLUMNS if c != "montant"]}
+    assert "montant" in COLUMNS
 
 
 def test_aucune_preference_retombe_sur_le_defaut(tableau):
@@ -79,7 +80,8 @@ def test_aucune_preference_retombe_sur_le_defaut(tableau):
 
     coches = tableau.update_checkboxes_from_hidden_columns(True, None)
 
-    assert coches == [COLUMNS.index(c) for c in COLUMNS if c not in defaut]
+    assert defaut, "le défaut du Tableau masque des colonnes : sinon rien n'est testé"
+    assert coches == {"ids": [c for c in COLUMNS if c not in defaut]}
 
 
 def test_liste_vide_affiche_toutes_les_colonnes(tableau):
@@ -87,4 +89,4 @@ def test_liste_vide_affiche_toutes_les_colonnes(tableau):
 
     coches = tableau.update_checkboxes_from_hidden_columns(True, [])
 
-    assert coches == list(range(len(COLUMNS)))
+    assert coches == {"ids": COLUMNS}

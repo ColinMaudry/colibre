@@ -47,9 +47,10 @@ from src.utils.query_ast import (
 )
 from src.utils.seo import META_CONTENT
 from src.utils.table import (
-    COLUMNS,
     format_number,
     get_default_hidden_columns,
+    hidden_columns_from_selection,
+    selection_from_hidden_columns,
     write_styled_excel,
 )
 from src.utils.tracking import track_download, track_search
@@ -680,19 +681,28 @@ def toggle_tableau_help(click_open, click_close, is_open):
 
 @callback(
     Output("tableau-hidden-columns", "data", allow_duplicate=True),
-    Input("tableau_column_list", "selected_rows"),
+    Input("tableau_column_list", "selectedRows"),
+    State("tableau-hidden-columns", "data"),
     prevent_initial_call=True,
 )
-def update_hidden_columns_from_checkboxes(selected_columns):
-    # selected_columns == [] est un choix explicite (tout décoché), à ne pas
-    # confondre avec « pas encore de préférence » : cf. apply_hidden_columns
-    # et update_checkboxes_from_hidden_columns, qui eux distinguent ce cas de
-    # None. Sans ce traitement uniforme, décocher/cocher toutes les colonnes
-    # se faisait écraser par update_checkboxes_from_hidden_columns au tour
-    # suivant (`hidden_cols or get_default_hidden_columns(...)`).
-    selected = [COLUMNS[i] for i in (selected_columns or [])]
-    hidden_columns = [col for col in COLUMNS if col not in selected]
-    return hidden_columns
+def update_hidden_columns_from_checkboxes(selected_rows, current_hidden):
+    # selected_rows == [] est un choix explicite (tout décoché), à ne pas
+    # confondre avec « pas encore de préférence » (store à None) : cf.
+    # apply_hidden_columns et update_checkboxes_from_hidden_columns, qui
+    # distinguent aussi ce cas. Sans ce traitement uniforme, décocher/cocher
+    # toutes les colonnes se faisait écraser au tour suivant.
+    hidden = hidden_columns_from_selection(selected_rows)
+    # Garde anti-écho (#139, #141) : poser selectedRows depuis le serveur à
+    # l'ouverture de la modale fait réémettre selectedRows par AG Grid. Si
+    # l'état calculé est déjà celui du store, ne rien réécrire.
+    reference = (
+        current_hidden
+        if current_hidden is not None
+        else get_default_hidden_columns("tableau")
+    )
+    if set(hidden) == set(reference):
+        return no_update
+    return hidden
 
 
 @callback(
@@ -708,7 +718,7 @@ def apply_hidden_columns(hidden_columns, column_state):
 
 
 @callback(
-    Output("tableau_column_list", "selected_rows"),
+    Output("tableau_column_list", "selectedRows"),
     Input("tableau_columns", "is_open"),
     State("tableau-hidden-columns", "data"),
 )
@@ -734,9 +744,8 @@ def update_checkboxes_from_hidden_columns(is_open, hidden_cols):
     if hidden_cols is None:
         hidden_cols = get_default_hidden_columns("tableau")
 
-    # Show all columns that are NOT hidden
-    visible_cols = [COLUMNS.index(col) for col in COLUMNS if col not in hidden_cols]
-    return visible_cols
+    # Coche toutes les colonnes qui ne sont PAS masquées
+    return selection_from_hidden_columns(hidden_cols)
 
 
 @callback(
