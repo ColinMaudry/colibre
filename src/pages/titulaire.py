@@ -436,7 +436,12 @@ def update_download_button_titulaire(pathname, titulaire_year):
 def get_top_acheteurs(pathname, titulaire_year):
     where_sql, params = _titulaire_scope(pathname, titulaire_year)
     return get_top_org_ag_grid(
-        query_marches(where_sql, params).lazy(), "acheteur", ["titulaire_distance"]
+        query_marches(where_sql, params).lazy(),
+        "acheteur",
+        ["titulaire_distance"],
+        # Toutes les organisations : le filtre texte de la grille doit
+        # trouver celles au-delà du 100e rang.
+        limit=None,
     )
 
 
