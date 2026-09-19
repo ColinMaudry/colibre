@@ -188,10 +188,9 @@ def get_sources_tables(source_path) -> html.Div:
     )
     dff = dff.drop("url", "unique")
     dff = dff.sort(by=["nb_marchés"], descending=True)
-    dff = dff.with_columns(
-        pl.col("nb_marchés").map_elements(format_number, return_dtype=pl.String),
-        pl.col("nb_acheteurs").map_elements(format_number, return_dtype=pl.String),
-    )
+    # nb_marchés et nb_acheteurs restent numériques dans rowData (tri AG Grid
+    # numérique) ; le formatage français est fait côté grille via
+    # valueFormatter, pas ici avec format_number.
 
     columns = {
         "nom": "Nom de la source",
@@ -201,36 +200,40 @@ def get_sources_tables(source_path) -> html.Div:
         "code": "Code",
     }
 
-    datatable = dash_table.DataTable(
-        id="source_table",
-        data=dff.to_dicts(),
-        columns=[
-            {
-                "name": columns[i],
-                "id": i,
-                "presentation": "markdown",
-                "type": "text",
-                "format": {"nully": "N/A"},
+    column_defs = []
+    for col in dff.columns:
+        col_def = {"field": col, "headerName": columns[col], "sortable": True}
+        if col in ("nom", "organisation"):
+            col_def |= {
+                "cellRenderer": "markdown",
+                "wrapText": True,
+                "autoHeight": True,
+                "flex": 2,
+                "minWidth": 220,
             }
-            for i in dff.schema.names()
-        ],
-        style_cell_conditional=[
-            {
-                "if": {"column_id": ["nom", "organisation"]},
-                "minWidth": "220px",
-                "textAlign": "left",
-                "overflow": "hidden",
-                "lineHeight": "14px",
-                "whiteSpace": "normal",
-            },
-        ],
-        sort_action="native",
-        markdown_options={"html": True},
-        style_header={"fontFamily": "Inter", "fontSize": "16px"},
-        style_cell={"fontFamily": "Inter", "fontSize": "16px"},
-    )
+        elif col in ("nb_marchés", "nb_acheteurs"):
+            col_def |= {
+                "type": "rightAligned",
+                "flex": 1,
+                "valueFormatter": {
+                    "function": (
+                        "params.value == null ? 'N/A' : "
+                        "Intl.NumberFormat('fr-FR').format(params.value)"
+                    )
+                },
+            }
+        else:
+            col_def["flex"] = 1
+        column_defs.append(col_def)
 
-    return html.Div(children=datatable)
+    return html.Div(
+        client_grid(
+            "source_table",
+            column_defs,
+            dff.to_dicts(),
+            defaultColDef={"valueFormatter": {"function": "params.value ?? 'N/A'"}},
+        )
+    )
 
 
 class DataTable(dash_table.DataTable):
