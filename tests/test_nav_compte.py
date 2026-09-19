@@ -55,7 +55,7 @@ def test_mon_compte_ouvre_un_menu_au_lieu_de_naviguer(monkeypatch):
     """Le cœur de l'issue : le libellé déclenche un menu, il ne navigue plus."""
     menu = _menu(monkeypatch, has_subscription=True)
     assert isinstance(menu, dbc.DropdownMenu)
-    assert menu.label == "Espace abonné"
+    assert menu.label == "Mon compte"
 
 
 def test_menu_liste_toutes_les_sections_pour_un_abonne(monkeypatch):

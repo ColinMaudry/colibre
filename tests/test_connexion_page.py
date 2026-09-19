@@ -4,7 +4,7 @@ def test_connexion_cta_points_to_abonnement():
 
     text = str(connexion.layout())
     assert "/projet/abonnement" in text
-    assert "Voir les abonnements" in text
+    assert "abonnements disponibles" in text
     assert "Pas encore de compte" in text
 
 
