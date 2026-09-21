@@ -1,7 +1,6 @@
 import polars as pl
 from dash.testing.composite import DashComposite
 from selenium.webdriver import Keys
-from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -45,16 +44,17 @@ def test_001_logo_and_search(dash_duo: DashComposite):
         search_bar.send_keys(name)
         search_bar.send_keys(Keys.ENTER)
 
-        dash_duo.wait_for_element(f"#results_{org_type}_datatable", timeout=2)
-        result_table: WebElement = dash_duo.find_element(
-            f"#results_{org_type}_datatable tbody"
+        dash_duo.wait_for_element(
+            f"#results_{org_type}_datatable .ag-center-cols-container .ag-row",
+            timeout=4,
+        )
+        result_rows = dash_duo.find_elements(
+            f"#results_{org_type}_datatable .ag-center-cols-container .ag-row"
         )
 
-        assert len(result_table.find_elements(by=By.TAG_NAME, value="tr")) == 2, (
-            "The search should return only one result"
-        )  # header row + 1 result
-        assert result_table.find_element(
-            by=By.CSS_SELECTOR, value=f'td[data-dash-column="{org_type}_nom"]'
+        assert len(result_rows) == 1, "The search should return only one result"
+        assert dash_duo.find_element(
+            f'#results_{org_type}_datatable .ag-cell[col-id="{org_type}_nom"]'
         ).text.startswith(name), (
             f"The search result should have the right {org_type} name"
         )
@@ -235,11 +235,13 @@ def test_008_search_to_observatoire(dash_duo: DashComposite):
     search_bar.send_keys("ACHETEUR 1")
     search_bar.send_keys(Keys.ENTER)
 
-    dash_duo.wait_for_element("#results_acheteur_datatable", timeout=2)
+    dash_duo.wait_for_element(
+        "#results_acheteur_datatable .ag-center-cols-container .ag-row", timeout=4
+    )
 
     # Find the observatoire link in acheteur_nom column
     observatoire_link = dash_duo.find_element(
-        '#results_acheteur_datatable td[data-dash-column="acheteur_nom"] a[href*="observatoire"]'
+        '#results_acheteur_datatable .ag-cell[col-id="acheteur_nom"] a[href*="observatoire"]'
     )
     assert "📊" in observatoire_link.text
 

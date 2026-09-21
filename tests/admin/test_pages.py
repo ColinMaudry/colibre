@@ -51,6 +51,25 @@ def _cleanup_user(user_id: int) -> None:
     conn.execute("VACUUM")
 
 
+def _row_index_of(dash_duo: DashComposite, email: str):
+    """row-index AG Grid de la ligne dont la cellule email vaut `email`."""
+    for cell in dash_duo.driver.find_elements(
+        "css selector", "#admin-table .ag-cell[col-id='email']"
+    ):
+        if cell.text == email:
+            row = cell.find_element("xpath", "ancestor::div[@row-index][1]")
+            return row.get_attribute("row-index")
+    return None
+
+
+def _email_verified(user_id: int):
+    return (
+        auth_db.get_conn()
+        .execute("SELECT email_verified FROM users WHERE id = ?", (user_id,))
+        .fetchone()[0]
+    )
+
+
 def _login(dash_duo: DashComposite, email: str):
     dash_duo.driver.get(dash_duo.server_url + "/connexion")
     dash_duo.wait_for_element("input[name=email]", timeout=8).send_keys(email)
@@ -118,16 +137,52 @@ def test_admin_full_flow(dash_duo: DashComposite, monkeypatch):
         dash_duo.wait_for_text_to_equal("h2", "Panneau admin", timeout=8)
         assert target_email in dash_duo.driver.page_source  # table users, par défaut
 
+        # Éditeur select (email_verified) sur la ligne de l'utilisateur cible.
+        until(lambda: _row_index_of(dash_duo, target_email) is not None, timeout=8)
+        row_index = _row_index_of(dash_duo, target_email)
+        verified_cell = dash_duo.driver.find_element(
+            "css selector",
+            f"#admin-table .ag-row[row-index='{row_index}'] "
+            ".ag-cell[col-id='email_verified']",
+        )
+        assert verified_cell.text == "1"
+        verified_cell.click()
+        # L'éditeur select s'ouvre replié : un clic déplie la liste.
+        dash_duo.wait_for_element(
+            "#admin-table .ag-cell-inline-editing .ag-picker-field-wrapper", timeout=8
+        ).click()
+        dash_duo.wait_for_element(".ag-select-list .ag-list-item", timeout=8)
+        option_0 = next(
+            item
+            for item in dash_duo.driver.find_elements(
+                "css selector", ".ag-select-list .ag-list-item"
+            )
+            if item.text.strip() == "0"
+        )
+        option_0.click()
+        dash_duo.wait_for_text_to_equal(
+            "#admin-alerts .alert-success", "Modification enregistrée.", timeout=8
+        )
+        until(lambda: _email_verified(target_uid) == 0, timeout=8)
+
         select = Select(dash_duo.wait_for_element("#admin-table-select", timeout=8))
         select.select_by_value("subscriptions")
-        dash_duo.wait_for_element(
-            "td[data-dash-column='prix_ht'][data-dash-row='0']", timeout=8
+        prix_selector = "#admin-table .ag-row[row-index='0'] .ag-cell[col-id='prix_ht']"
+        dash_duo.wait_for_element(prix_selector, timeout=8)
+        # Attendre que l'alerte de l'édition précédente soit effacée par la
+        # bascule de table, pour ne pas lire l'ancienne alerte de succès.
+        until(
+            lambda: not dash_duo.driver.find_elements(
+                "css selector", "#admin-alerts .alert-success"
+            ),
+            timeout=8,
         )
 
-        cell = dash_duo.driver.find_element(
-            "css selector", "td[data-dash-column='prix_ht'][data-dash-row='0']"
+        # Un clic simple entre en édition (singleClickEdit).
+        dash_duo.driver.find_element("css selector", prix_selector).click()
+        dash_duo.wait_for_element(
+            f"{prix_selector}.ag-cell-inline-editing input", timeout=8
         )
-        cell.click()
         active_input = dash_duo.driver.switch_to.active_element
         active_input.send_keys(Keys.CONTROL, "a")
         active_input.send_keys("30")

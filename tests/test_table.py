@@ -341,3 +341,75 @@ def test_postprocess_page_without_uid_has_no_marche():
     result = postprocess_page(dff)
 
     assert "marche" not in result.columns
+
+
+# Sélecteur de colonnes en AG Grid (#141) : conversion entre les lignes cochées
+# (`selectedRows`) et la liste des colonnes masquées du store.
+
+
+def test_hidden_columns_from_selection_masque_les_colonnes_non_cochees():
+    from src.utils.table import COLUMNS, hidden_columns_from_selection
+
+    cochees = [COLUMNS[2], COLUMNS[0]]  # ordre volontairement inversé
+    # Lignes telles qu'AG Grid les réémet : la ligne entière, pas que l'id.
+    lignes = [{"id": c, "name": f"titre {c}", "description": "…"} for c in cochees]
+
+    masquees = hidden_columns_from_selection(lignes)
+
+    assert masquees == [c for c in COLUMNS if c not in cochees]
+    assert COLUMNS[1] in masquees
+    assert COLUMNS[0] not in masquees and COLUMNS[2] not in masquees
+
+
+@pytest.mark.parametrize("selection", [[], None])
+def test_hidden_columns_from_selection_vide_masque_tout(selection):
+    """Tout décocher est un choix explicite : toutes les colonnes masquées."""
+    from src.utils.table import COLUMNS, hidden_columns_from_selection
+
+    assert len(COLUMNS) > 3
+    assert hidden_columns_from_selection(selection) == COLUMNS
+
+
+def test_selection_from_hidden_columns_coche_les_colonnes_visibles():
+    from src.utils.table import COLUMNS, selection_from_hidden_columns
+
+    masquees = [COLUMNS[3], COLUMNS[1]]
+
+    selection = selection_from_hidden_columns(masquees)
+
+    assert selection == {"ids": [c for c in COLUMNS if c not in masquees]}
+    assert COLUMNS[0] in selection["ids"]
+
+
+def test_selection_from_hidden_columns_vide_coche_tout():
+    from src.utils.table import COLUMNS, selection_from_hidden_columns
+
+    assert selection_from_hidden_columns([]) == {"ids": COLUMNS}
+
+
+def test_selection_et_colonnes_masquees_aller_retour():
+    from src.utils.table import (
+        COLUMNS,
+        hidden_columns_from_selection,
+        selection_from_hidden_columns,
+    )
+
+    masquees = [COLUMNS[1], COLUMNS[4], COLUMNS[-1]]
+    lignes = [{"id": i} for i in selection_from_hidden_columns(masquees)["ids"]]
+
+    assert hidden_columns_from_selection(lignes) == masquees
+
+
+def test_hidden_columns_from_selection_accepte_la_forme_ids():
+    """La valeur posée par le serveur (`{"ids": [...]}`) redéclenche aussi le
+    callback « cases → store » : Dash chaîne les callbacks sur la sortie écrite,
+    avant qu'AG Grid ne réémette la sélection sous forme de lignes. Vu en
+    navigateur : sans ce cas, le callback levait une erreur (HTTP 500)."""
+    from src.utils.table import COLUMNS, hidden_columns_from_selection
+
+    cochees = [COLUMNS[0], COLUMNS[2]]
+
+    masquees = hidden_columns_from_selection({"ids": cochees})
+
+    assert masquees == [c for c in COLUMNS if c not in cochees]
+    assert COLUMNS[1] in masquees

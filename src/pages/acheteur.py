@@ -27,9 +27,10 @@ from src.utils.entity_grid import entity_scope, register_entity_grid_callbacks
 from src.utils.frontend import DROPDOWN_LABELS_FR, get_button_properties
 from src.utils.seo import META_CONTENT, make_org_jsonld
 from src.utils.table import (
-    COLUMNS,
     format_number,
     get_default_hidden_columns,
+    hidden_columns_from_selection,
+    selection_from_hidden_columns,
     write_styled_excel,
 )
 from src.utils.tracking import track_download
@@ -398,7 +399,12 @@ def update_download_button_acheteur(pathname, ach_year):
 def get_top_titulaires(pathname, ach_year):
     where_sql, params = _acheteur_scope(pathname, ach_year)
     table = get_top_org_ag_grid(
-        query_marches(where_sql, params).lazy(), "titulaire", ["titulaire_distance"]
+        query_marches(where_sql, params).lazy(),
+        "titulaire",
+        ["titulaire_distance"],
+        # Toutes les organisations : le filtre texte de la grille doit
+        # trouver celles au-delà du 100e rang.
+        limit=None,
     )
     return make_card(fig=table, title="Top titulaires", lg=12, xl=12)
 
@@ -436,20 +442,30 @@ def download_acheteur_data(
 
 @callback(
     Output("acheteur-hidden-columns", "data", allow_duplicate=True),
-    Input("acheteur_column_list", "selected_rows"),
+    Input("acheteur_column_list", "selectedRows"),
+    State("acheteur-hidden-columns", "data"),
     prevent_initial_call=True,
 )
-def update_hidden_columns_from_checkboxes(selected_columns):
-    if selected_columns:
-        selected_columns = [COLUMNS[i] for i in selected_columns]
-        hidden_columns = [col for col in COLUMNS if col not in selected_columns]
-        return hidden_columns
-    else:
-        return []
+def update_hidden_columns_from_checkboxes(selected_rows, current_hidden):
+    hidden = hidden_columns_from_selection(selected_rows)
+    # Garde anti-écho (#139, #141) : poser selectedRows depuis le serveur à
+    # l'ouverture de la modale fait réémettre selectedRows par AG Grid. Si
+    # l'état calculé est déjà celui du store, ne rien réécrire.
+    reference = (
+        current_hidden
+        if current_hidden is not None
+        else get_default_hidden_columns("acheteur")
+    )
+    if set(hidden) == set(reference):
+        return no_update
+    return hidden
 
 
 @callback(
-    Output("acheteur_column_list", "selected_rows"),
+    Output("acheteur_column_list", "selectedRows"),
+    # La modale démonte la grille à la fermeture : la grille recréée à la
+    # réouverture n'a plus de filtre rapide, le champ de recherche est vidé.
+    Output({"type": "column-search", "page": "acheteur"}, "value"),
     Input("acheteur_columns", "is_open"),
     State("acheteur-hidden-columns", "data"),
 )
@@ -464,13 +480,16 @@ def update_checkboxes_from_hidden_columns(is_open, hidden_cols):
     ce second écrivain existe (application d'une vue partagée).
     """
     if not is_open:
-        return no_update
+        return no_update, no_update
 
-    hidden_cols = hidden_cols or get_default_hidden_columns("acheteur")
+    # None = pas encore de préférence ; [] = choix explicite de tout
+    # afficher, à respecter tel quel (même distinction que la garde de
+    # update_hidden_columns_from_checkboxes).
+    if hidden_cols is None:
+        hidden_cols = get_default_hidden_columns("acheteur")
 
-    # Show all columns that are NOT hidden
-    visible_cols = [COLUMNS.index(col) for col in COLUMNS if col not in hidden_cols]
-    return visible_cols
+    # Coche toutes les colonnes qui ne sont PAS masquées
+    return selection_from_hidden_columns(hidden_cols), ""
 
 
 @callback(

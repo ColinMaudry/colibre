@@ -17,26 +17,34 @@ def test_update_table_read_path_rejects_non_admin(monkeypatch):
     monkeypatch.setattr(liste, "is_admin", lambda: False)
     # Chemin lecture (sélection d'une table) : ne doit RIEN renvoyer.
     with pytest.raises(PreventUpdate):
-        liste._update_table("users", [], None)
+        liste._update_table("users", [])
 
 
 def test_update_table_write_path_rejects_non_admin(monkeypatch):
     monkeypatch.setattr(liste, "is_admin", lambda: False)
-    # Chemin écriture (édition de cellule simulée) : ne doit RIEN modifier.
-    data = [{"id": 1, "email": "a@b.fr"}]
-    data_previous = [{"id": 1, "email": "victime@b.fr"}]
+    # Chemin écriture (édition de cellule simulée, format cellValueChanged AG Grid 35).
+    cell_changes = [
+        {
+            "rowIndex": 0,
+            "rowId": "1",
+            "colId": "email",
+            "oldValue": "victime@b.fr",
+            "value": "a@b.fr",
+            "data": {"id": 1, "email": "a@b.fr"},
+        }
+    ]
     with pytest.raises(PreventUpdate):
-        liste._update_table("users", data, data_previous)
+        liste._update_table("users", cell_changes)
 
 
 def test_update_table_allows_admin(monkeypatch):
-    # Avec is_admin() vrai, la garde ne bloque pas : sans changement de cellule
-    # détecté, le callback renvoie 4 valeurs (pas de PreventUpdate).
+    # Avec is_admin() vrai, la garde ne bloque pas : sans cellValueChanged exploitable,
+    # le callback renvoie 3 valeurs (pas de PreventUpdate).
     monkeypatch.setattr(liste, "is_admin", lambda: True)
 
     class _Ctx:
         triggered_id = "autre-composant"
 
     monkeypatch.setattr(liste, "ctx", _Ctx)
-    result = liste._update_table("users", None, None)
-    assert len(result) == 4
+    result = liste._update_table("users", None)
+    assert len(result) == 3

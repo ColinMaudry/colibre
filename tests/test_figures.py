@@ -325,6 +325,40 @@ def test_get_org_location_map_defaults_to_france_view_without_coordinates():
     assert leaflet_map.zoom == 5
 
 
+def test_get_org_location_map_tile_layer_has_tuiles_classname():
+    """La couche de tuiles OSM porte className="tuiles" : c'est ce sélecteur
+    que le bloc CSS mode sombre (#118) cible pour l'assombrir (filter)."""
+    import dash_leaflet as dl
+
+    from src.figures import get_org_location_map
+
+    leaflet_map = get_org_location_map(_org_map_dff(), "acheteur", "test-map")
+
+    tile_layers = [c for c in leaflet_map.children if isinstance(c, dl.TileLayer)]
+    assert len(tile_layers) == 1
+    assert tile_layers[0].className == "tuiles"
+
+
+def test_make_clusters_map_tile_layer_has_tuiles_classname():
+    import dash_leaflet as dl
+
+    from src.figures import make_clusters_map
+
+    region = {
+        "name": "Hexagone",
+        "data": ([], []),
+        "coordinates": [46.6, 2.2],
+        "zoom_leaflet": 5,
+    }
+
+    div = make_clusters_map(region)
+
+    leaflet_map = next(c for c in div.children if isinstance(c, dl.Map))
+    tile_layers = [c for c in leaflet_map.children if isinstance(c, dl.TileLayer)]
+    assert len(tile_layers) == 1
+    assert tile_layers[0].className == "tuiles"
+
+
 def test_bounds_to_center_zoom_single_point_uses_max_zoom():
     from src.figures import bounds_to_center_zoom
 
@@ -407,6 +441,94 @@ def test_ag_grid_defaults_unchanged_for_tableau():
     assert grid.persistence is True
 
 
+# --- client_grid() : fabrique commune des grilles AG Grid client-side ------
+
+
+def test_client_grid_returns_grid_with_id_columndefs_rowdata():
+    from src.figures import client_grid
+
+    column_defs = [{"field": "nom"}]
+    row_data = [{"nom": "Org 1"}]
+    grid = client_grid("mon_id", column_defs, row_data)
+
+    import dash_ag_grid as dag
+
+    assert isinstance(grid, dag.AgGrid)
+    assert grid.id == "mon_id"
+    assert grid.columnDefs == column_defs
+    assert grid.rowData == row_data
+
+
+def test_client_grid_sets_theme_locale_layout_and_persistence():
+    from src.figures import AG_GRID_LOCALE_FR, AG_GRID_THEME, client_grid
+
+    grid = client_grid("mon_id", [], [])
+    options = grid.dashGridOptions
+
+    assert options["theme"] == AG_GRID_THEME
+    assert options["localeText"] == AG_GRID_LOCALE_FR
+    assert options["domLayout"] == "autoHeight"
+    assert options["suppressCellFocus"] is True
+    assert grid.dangerously_allow_code is True
+    assert grid.persistence is False
+
+
+def test_client_grid_without_page_size_has_no_pagination():
+    from src.figures import client_grid
+
+    grid = client_grid("mon_id", [], [])
+
+    assert "pagination" not in grid.dashGridOptions
+    assert "paginationPageSize" not in grid.dashGridOptions
+
+
+def test_client_grid_with_page_size_enables_pagination():
+    from src.figures import client_grid
+
+    grid = client_grid("mon_id", [], [], page_size=10)
+
+    assert grid.dashGridOptions["pagination"] is True
+    assert grid.dashGridOptions["paginationPageSize"] == 10
+
+
+def test_client_grid_merges_dash_grid_options_and_can_override():
+    from src.figures import client_grid
+
+    grid = client_grid(
+        "mon_id",
+        [],
+        [],
+        dash_grid_options={
+            "domLayout": "normal",
+            "enableCellTextSelection": True,
+        },
+    )
+    options = grid.dashGridOptions
+
+    # surcharge une valeur commune...
+    assert options["domLayout"] == "normal"
+    # ...sans faire disparaître les autres options par défaut
+    assert options["suppressCellFocus"] is True
+    # ...et ajoute la nouvelle option fusionnée
+    assert options["enableCellTextSelection"] is True
+
+
+def test_client_grid_passes_through_extra_ag_grid_kwargs():
+    from src.figures import client_grid
+
+    default_col_def = {"resizable": True}
+    grid = client_grid(
+        "mon_id",
+        [],
+        [],
+        defaultColDef=default_col_def,
+        getRowId="params.data.uid",
+    )
+
+    assert grid.defaultColDef == default_col_def
+    assert grid.getRowId == "params.data.uid"
+
+
 def test_get_top_org_ag_grid_returns_grid_with_rowdata():
     """Le top 10 devient une AG Grid client-side (rowData directe, pas de
     getRowsRequest server-side)."""
@@ -427,7 +549,7 @@ def test_get_top_org_ag_grid_returns_grid_with_rowdata():
 
 
 def test_get_top_org_ag_grid_empty_returns_div():
-    """Données vides → html.Div() (parité get_top_org_table)."""
+    """Données vides → html.Div()."""
     import polars as pl
     from dash import html
 
@@ -440,23 +562,9 @@ def test_get_top_org_ag_grid_empty_returns_div():
     assert isinstance(out, html.Div)
 
 
-def test_get_top_org_table_still_returns_datatable_after_refactor():
-    """Non-régression : get_top_org_table (utilisé par observatoire.py) garde
-    son comportement après extraction du helper d'agrégation partagé."""
-    import dash_ag_grid  # noqa: F401
-    from dash import html
-
-    from src.db import query_marches
-    from src.figures import DataTable, get_top_org_table
-
-    lff = query_marches("TRUE", (), columns=None).lazy()
-    out = get_top_org_table(lff, "titulaire", ["titulaire_distance"])
-    assert isinstance(out, (DataTable, html.Div))
-
-
 def test_top_org_aggregate_does_not_mutate_extra_columns():
     """Le helper ne mute pas la liste extra_columns passée (bug latent de
-    l'ancien get_top_org_table, qui faisait extra_columns.append(...))."""
+    l'ancien tableau dash_table, qui faisait extra_columns.append(...))."""
     from src.db import query_marches
     from src.figures import _top_org_aggregate
 
@@ -489,37 +597,38 @@ def _fake_marches(n_orgs: int, org_type: str = "titulaire"):
     return pl.DataFrame(rows).lazy()
 
 
-def test_get_top_org_table_truncates_to_limit():
-    """La pagination de DataTable est côté client : sans troncature, toutes
-    les lignes transitent par le navigateur pour n'en afficher que 10."""
-    from src.figures import get_top_org_table
+def test_get_top_org_ag_grid_truncates_to_limit():
+    """La pagination d'AG Grid en mode client-side est côté client : sans
+    troncature, toutes les lignes transitent par le navigateur pour n'en
+    afficher que 10."""
+    from src.figures import get_top_org_ag_grid
 
     lff = _fake_marches(120)
-    complet = get_top_org_table(lff, "titulaire", [], filters=False, limit=None)
-    tronque = get_top_org_table(lff, "titulaire", [], filters=False, limit=100)
+    complet = get_top_org_ag_grid(lff, "titulaire", [], filters=False, limit=None)
+    tronque = get_top_org_ag_grid(lff, "titulaire", [], filters=False, limit=100)
 
-    assert len(complet.data) == 120
-    assert len(tronque.data) == 100
+    assert len(complet.rowData) == 120
+    assert len(tronque.rowData) == 100
     # l'agrégat est trié par Attributions décroissant : on garde bien la tête
     # du classement, pas 100 lignes au hasard
-    gardes = {row["titulaire_nom_tooltip"] for row in tronque.data}
+    gardes = {row["titulaire_nom_tooltip"] for row in tronque.rowData}
     assert gardes == {f"Org {i}" for i in range(100)}
 
 
-def test_get_top_org_table_defaults_to_100_rows():
-    from src.figures import get_top_org_table
+def test_get_top_org_ag_grid_defaults_to_100_rows():
+    from src.figures import get_top_org_ag_grid
 
-    table = get_top_org_table(_fake_marches(120), "titulaire", [], filters=False)
-    assert len(table.data) == 100
+    grid = get_top_org_ag_grid(_fake_marches(120), "titulaire", [], filters=False)
+    assert len(grid.rowData) == 100
 
 
-def test_get_top_org_table_limit_above_row_count_is_harmless():
-    from src.figures import get_top_org_table
+def test_get_top_org_ag_grid_limit_above_row_count_is_harmless():
+    from src.figures import get_top_org_ag_grid
 
-    table = get_top_org_table(
+    grid = get_top_org_ag_grid(
         _fake_marches(7, "acheteur"), "acheteur", [], filters=False
     )
-    assert len(table.data) == 7
+    assert len(grid.rowData) == 7
 
 
 # --- Ordre des cards de l'observatoire (issue #107) ---------------------------
@@ -563,6 +672,29 @@ def test_build_dashboard_cards_assigns_card_ids():
 
     for expected_id in _CARD_IDS_FIXES:
         assert expected_id in ids, f"card_id manquant : {expected_id}"
+
+
+def test_build_dashboard_cards_top_org_cards_use_ag_grid():
+    """Les cards top-acheteurs/top-titulaires passent en AG Grid (#141) : fini
+    le DataTable, dont le dark mode dépend d'un CSS spécifique."""
+    import dash_ag_grid as dag
+    from dash import dash_table
+
+    build_dashboard_cards, dff = _cards_de_test()
+    cards = build_dashboard_cards(dff)
+
+    for card_id in ("top-acheteurs", "top-titulaires"):
+        card = next(
+            c
+            for c in cards
+            if isinstance(getattr(c, "id", None), dict) and c.id.get("index") == card_id
+        )
+        grids = _find_components(card, dag.AgGrid)
+        tables = _find_components(card, dash_table.DataTable)
+
+        assert grids, f"aucune AgGrid dans la card {card_id}"
+        assert grids[0].rowData, f"AgGrid sans lignes dans la card {card_id}"
+        assert not tables, f"DataTable encore présent dans la card {card_id}"
 
 
 def test_build_dashboard_cards_with_order_reorders_cards():
@@ -625,3 +757,341 @@ def test_reorder_cards_ordre_vide_ne_change_rien():
     cards = build_dashboard_cards(dff)
 
     assert _card_ids(reorder_cards(cards, [])) == _card_ids(cards)
+
+
+# --- Mode sombre (#118) : palettes Earthsong et paramètre theme -------------
+
+
+def _find_components(component, cls, found=None):
+    """Cherche récursivement les composants d'une classe donnée (children
+    Dash pouvant être une liste, un composant unique, ou une chaîne)."""
+    if found is None:
+        found = []
+    if isinstance(component, cls):
+        found.append(component)
+    children = getattr(component, "children", None)
+    if isinstance(children, (list, tuple)):
+        for c in children:
+            _find_components(c, cls, found)
+    elif children is not None:
+        _find_components(children, cls, found)
+    return found
+
+
+def test_appliquer_theme_sombre_pose_fond_police_et_grille():
+    import plotly.graph_objects as go
+
+    from src.figures import FOND_SOMBRE, TEXTE_SOMBRE, appliquer_theme
+    from src.theme import SOMBRE
+
+    fig = go.Figure()
+    fig = appliquer_theme(fig, SOMBRE)
+
+    assert fig.layout.paper_bgcolor == FOND_SOMBRE
+    assert fig.layout.plot_bgcolor == FOND_SOMBRE
+    assert fig.layout.font.color == TEXTE_SOMBRE
+    # Barre d'outils : fond blanc translucide par défaut
+    assert fig.layout.modebar.bgcolor == "rgba(0,0,0,0)"
+    assert fig.layout.modebar.activecolor == TEXTE_SOMBRE
+
+
+def test_appliquer_theme_clair_laisse_le_rendu_inchange():
+    """Comparaison avec la figure avant l'appel (pas avec None) : le thème
+    clair ne doit poser aucune de ces propriétés."""
+    import plotly.graph_objects as go
+
+    from src.figures import appliquer_theme
+    from src.theme import CLAIR
+
+    fig = go.Figure()
+    avant = (
+        fig.layout.paper_bgcolor,
+        fig.layout.plot_bgcolor,
+        fig.layout.font.color,
+    )
+
+    fig = appliquer_theme(fig, CLAIR)
+
+    apres = (
+        fig.layout.paper_bgcolor,
+        fig.layout.plot_bgcolor,
+        fig.layout.font.color,
+    )
+    assert apres == avant
+
+
+def test_make_donut_theme_sombre_utilise_la_palette_sombre():
+    from src.figures import PALETTE_SOMBRE, make_donut
+    from src.theme import SOMBRE
+
+    lff = _make_lff(
+        [
+            {"uid": "u1", "acheteur_categorie": "A"},
+            {"uid": "u2", "acheteur_categorie": "B"},
+        ]
+    )
+
+    graph = make_donut(lff, "acheteur_categorie", per_uid=True, theme=SOMBRE)
+    piecolorway = list(graph.figure.layout.piecolorway)
+
+    assert piecolorway
+    assert set(piecolorway) <= set(PALETTE_SOMBRE)
+
+
+def test_make_donut_theme_clair_utilise_px_safe():
+    import plotly.express as px
+
+    from src.figures import make_donut
+    from src.theme import CLAIR
+
+    lff = _make_lff(
+        [
+            {"uid": "u1", "acheteur_categorie": "A"},
+            {"uid": "u2", "acheteur_categorie": "B"},
+        ]
+    )
+
+    graph = make_donut(lff, "acheteur_categorie", per_uid=True, theme=CLAIR)
+    piecolorway = list(graph.figure.layout.piecolorway)
+
+    assert piecolorway == list(px.colors.qualitative.Safe)
+
+
+def test_make_donut_sans_theme_hors_requete_reste_clair():
+    """Non-régression : sans argument theme, et hors contexte de requête
+    (comme en test), le rendu clair actuel est inchangé."""
+    import plotly.express as px
+
+    from src.figures import make_donut
+
+    lff = _make_lff([{"uid": "u1", "acheteur_categorie": "A"}])
+
+    graph = make_donut(lff, "acheteur_categorie", per_uid=True)
+
+    assert list(graph.figure.layout.piecolorway) == list(px.colors.qualitative.Safe)
+
+
+def test_get_barchart_sources_theme_sombre_utilise_palette_sombre_24():
+    from datetime import datetime
+
+    from src.figures import PALETTE_SOMBRE_24, get_barchart_sources
+    from src.theme import SOMBRE
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "dateNotification": datetime(2021, 1, 1),
+                "sourceDataset": "a",
+            },
+            {
+                "uid": "u2",
+                "dateNotification": datetime(2021, 1, 2),
+                "sourceDataset": "b",
+            },
+        ]
+    )
+
+    graph = get_barchart_sources(lff, "dateNotification", theme=SOMBRE)
+
+    couleurs = {trace.marker.color for trace in graph.figure.data}
+    assert couleurs
+    assert couleurs <= set(PALETTE_SOMBRE_24)
+
+
+def test_get_barchart_sources_sans_theme_hors_requete_reste_clair():
+    """Non-régression : rendu clair (Dark24) inchangé sans argument theme."""
+    from datetime import datetime
+
+    import plotly.express as px
+
+    from src.figures import get_barchart_sources
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "dateNotification": datetime(2021, 1, 1),
+                "sourceDataset": "a",
+            },
+        ]
+    )
+
+    graph = get_barchart_sources(lff, "dateNotification")
+
+    couleurs = {trace.marker.color for trace in graph.figure.data}
+    assert couleurs <= set(px.colors.qualitative.Dark24)
+
+
+def test_build_org_markers_theme_sombre_utilise_org_colors_sombre():
+    from src.figures import ORG_COLORS_SOMBRE, build_org_markers
+    from src.theme import SOMBRE
+
+    lff = pl.LazyFrame(
+        [
+            {
+                "uid": "u1",
+                "acheteur_longitude": 2.35,
+                "acheteur_latitude": 48.85,
+                "acheteur_nom": "ACHETEUR A",
+            },
+        ]
+    )
+
+    markers = build_org_markers(lff, "acheteur", theme=SOMBRE)
+
+    assert markers[0]["marker_color"] == ORG_COLORS_SOMBRE["acheteur"]
+
+
+def test_build_org_markers_theme_clair_utilise_org_colors():
+    """Non-régression : en clair, la couleur reste celle d'ORG_COLORS."""
+    from src.figures import ORG_COLORS, build_org_markers
+    from src.theme import CLAIR
+
+    lff = pl.LazyFrame(
+        [
+            {
+                "uid": "u1",
+                "acheteur_longitude": 2.35,
+                "acheteur_latitude": 48.85,
+                "acheteur_nom": "ACHETEUR A",
+            },
+        ]
+    )
+
+    markers = build_org_markers(lff, "acheteur", theme=CLAIR)
+
+    assert markers[0]["marker_color"] == ORG_COLORS["acheteur"]
+
+
+def test_palette_sombre_24_a_24_couleurs_distinctes():
+    from src.figures import PALETTE_SOMBRE_24
+
+    assert len(PALETTE_SOMBRE_24) == 24
+    assert len(set(PALETTE_SOMBRE_24)) == 24
+
+
+def test_get_considerations_card_content_theme_sombre_utilise_couleurs_sombres():
+    import dash_bootstrap_components as dbc
+
+    from src.figures import GRILLE_SOMBRE, get_considerations_card_content
+    from src.theme import SOMBRE
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "considerationsSociales": "Clause sociale",
+                "considerationsEnvironnementales": "Sans objet",
+            },
+            {
+                "uid": "u2",
+                "considerationsSociales": "Sans objet",
+                "considerationsEnvironnementales": "Critère environnemental",
+            },
+        ]
+    )
+
+    div = get_considerations_card_content(lff, theme=SOMBRE)
+
+    bars = [b for b in _find_components(div, dbc.Progress) if getattr(b, "bar", False)]
+    bar_ren, bar_social, bar_env = bars
+
+    assert bar_ren.color == GRILLE_SOMBRE
+    assert bar_social.color == "#d0633d"
+    assert bar_env.color == "#85c54c"
+
+
+def test_get_considerations_card_content_sans_theme_hors_requete_reste_clair():
+    """Non-régression : couleurs claires (#6c757d, #CC6677, #117733) inchangées."""
+    import dash_bootstrap_components as dbc
+
+    from src.figures import get_considerations_card_content
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "considerationsSociales": "Clause sociale",
+                "considerationsEnvironnementales": "Sans objet",
+            },
+        ]
+    )
+
+    div = get_considerations_card_content(lff)
+
+    bars = [b for b in _find_components(div, dbc.Progress) if getattr(b, "bar", False)]
+    bar_ren, bar_social, bar_env = bars
+
+    assert bar_ren.color == "#6c757d"
+    assert bar_social.color == "#CC6677"
+    assert bar_env.color == "#117733"
+
+
+def test_get_considerations_card_content_theme_sombre_texte_label_fonce():
+    """Le blanc du label (#118 finding 7) est illisible sur une barre claire
+    de la palette Earthsong (ex. #85c54c, environnement, ≈2.1:1) : en sombre,
+    le label passe en texte foncé (#121418, comme le bouton primaire)."""
+    import dash_bootstrap_components as dbc
+
+    from src.figures import get_considerations_card_content
+    from src.theme import SOMBRE
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "considerationsSociales": "Clause sociale",
+                "considerationsEnvironnementales": "Sans objet",
+            },
+        ]
+    )
+
+    div = get_considerations_card_content(lff, theme=SOMBRE)
+
+    bars = [b for b in _find_components(div, dbc.Progress) if getattr(b, "bar", False)]
+    assert bars, "aucune barre trouvée"
+    for bar in bars:
+        assert bar.style["color"] == "#121418"
+
+
+def test_get_considerations_card_content_theme_clair_texte_label_blanc_inchange():
+    """Non-régression : le label reste blanc en thème clair (octet identique)."""
+    import dash_bootstrap_components as dbc
+
+    from src.figures import get_considerations_card_content
+
+    lff = _make_lff(
+        [
+            {
+                "uid": "u1",
+                "considerationsSociales": "Clause sociale",
+                "considerationsEnvironnementales": "Sans objet",
+            },
+        ]
+    )
+
+    div = get_considerations_card_content(lff)
+
+    bars = [b for b in _find_components(div, dbc.Progress) if getattr(b, "bar", False)]
+    assert bars, "aucune barre trouvée"
+    for bar in bars:
+        assert bar.style["color"] == "white"
+
+
+def test_build_dashboard_cards_propage_le_theme_sombre_aux_figures():
+    """build_dashboard_cards résout le thème une fois et le transmet à toutes
+    les figures qu'il construit (donut de la card cat-acheteur ici)."""
+    from dash import dcc
+
+    from src.figures import FOND_SOMBRE, card_id_of
+    from src.theme import SOMBRE
+
+    build_dashboard_cards, dff = _cards_de_test()
+    cards = build_dashboard_cards(dff, theme=SOMBRE)
+
+    cat_acheteur = next(c for c in cards if card_id_of(c) == "cat-acheteur")
+    graphs = _find_components(cat_acheteur, dcc.Graph)
+
+    assert graphs
+    assert graphs[0].figure.layout.paper_bgcolor == FOND_SOMBRE

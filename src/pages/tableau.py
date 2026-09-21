@@ -34,6 +34,7 @@ from src.pages._compte_shell import current_user_has_subscription
 from src.saved_views import db as saved_views_db
 from src.saved_views import resolve as saved_views_resolve
 from src.saved_views import ui as saved_views_ui
+from src.theme import current_theme
 from src.utils import get_data_update_timestamp, logger
 from src.utils.cache import cache
 from src.utils.grid import apply_persisted_layout, fetch_grid_page, grid_column_defs
@@ -46,9 +47,10 @@ from src.utils.query_ast import (
 )
 from src.utils.seo import META_CONTENT
 from src.utils.table import (
-    COLUMNS,
     format_number,
     get_default_hidden_columns,
+    hidden_columns_from_selection,
+    selection_from_hidden_columns,
     write_styled_excel,
 )
 from src.utils.tracking import track_download, track_search
@@ -679,19 +681,28 @@ def toggle_tableau_help(click_open, click_close, is_open):
 
 @callback(
     Output("tableau-hidden-columns", "data", allow_duplicate=True),
-    Input("tableau_column_list", "selected_rows"),
+    Input("tableau_column_list", "selectedRows"),
+    State("tableau-hidden-columns", "data"),
     prevent_initial_call=True,
 )
-def update_hidden_columns_from_checkboxes(selected_columns):
-    # selected_columns == [] est un choix explicite (tout décoché), à ne pas
-    # confondre avec « pas encore de préférence » : cf. apply_hidden_columns
-    # et update_checkboxes_from_hidden_columns, qui eux distinguent ce cas de
-    # None. Sans ce traitement uniforme, décocher/cocher toutes les colonnes
-    # se faisait écraser par update_checkboxes_from_hidden_columns au tour
-    # suivant (`hidden_cols or get_default_hidden_columns(...)`).
-    selected = [COLUMNS[i] for i in (selected_columns or [])]
-    hidden_columns = [col for col in COLUMNS if col not in selected]
-    return hidden_columns
+def update_hidden_columns_from_checkboxes(selected_rows, current_hidden):
+    # selected_rows == [] est un choix explicite (tout décoché), à ne pas
+    # confondre avec « pas encore de préférence » (store à None) : cf.
+    # apply_hidden_columns et update_checkboxes_from_hidden_columns, qui
+    # distinguent aussi ce cas. Sans ce traitement uniforme, décocher/cocher
+    # toutes les colonnes se faisait écraser au tour suivant.
+    hidden = hidden_columns_from_selection(selected_rows)
+    # Garde anti-écho (#139, #141) : poser selectedRows depuis le serveur à
+    # l'ouverture de la modale fait réémettre selectedRows par AG Grid. Si
+    # l'état calculé est déjà celui du store, ne rien réécrire.
+    reference = (
+        current_hidden
+        if current_hidden is not None
+        else get_default_hidden_columns("tableau")
+    )
+    if set(hidden) == set(reference):
+        return no_update
+    return hidden
 
 
 @callback(
@@ -707,7 +718,10 @@ def apply_hidden_columns(hidden_columns, column_state):
 
 
 @callback(
-    Output("tableau_column_list", "selected_rows"),
+    Output("tableau_column_list", "selectedRows"),
+    # La modale démonte la grille à la fermeture : la grille recréée à la
+    # réouverture n'a plus de filtre rapide, le champ de recherche est vidé.
+    Output({"type": "column-search", "page": "tableau"}, "value"),
     Input("tableau_columns", "is_open"),
     State("tableau-hidden-columns", "data"),
 )
@@ -725,7 +739,7 @@ def update_checkboxes_from_hidden_columns(is_open, hidden_cols):
     store contient déjà : l'écriture est sans effet.
     """
     if not is_open:
-        return no_update
+        return no_update, no_update
 
     # None = pas encore de préférence enregistrée (première visite) ; []
     # est un choix explicite (« ne rien masquer »/tout afficher) et doit
@@ -733,9 +747,8 @@ def update_checkboxes_from_hidden_columns(is_open, hidden_cols):
     if hidden_cols is None:
         hidden_cols = get_default_hidden_columns("tableau")
 
-    # Show all columns that are NOT hidden
-    visible_cols = [COLUMNS.index(col) for col in COLUMNS if col not in hidden_cols]
-    return visible_cols
+    # Coche toutes les colonnes qui ne sont PAS masquées
+    return selection_from_hidden_columns(hidden_cols), ""
 
 
 @callback(
@@ -1011,7 +1024,7 @@ def _normalize_filter_model(filter_model: dict | None) -> str:
 
 
 @cache.memoize()
-def _cards_pour_filtre(filter_model_json: str):
+def _cards_pour_filtre(filter_model_json: str, theme: str):
     """Cards de l'observatoire pour le filtre courant de la grille.
 
     Mémoïsé sur le filterModel normalisé : basculer d'avant en arrière sur le
@@ -1019,13 +1032,16 @@ def _cards_pour_filtre(filter_model_json: str):
     grille sont ignorées — les cards ont besoin de colonnes que l'utilisateur
     n'affiche pas forcément (cf. issue #137) — et les tris aussi, ils
     n'influent sur aucune agrégation.
+
+    `theme` fait partie de la clé de cache : les figures sont colorées côté
+    serveur (#118).
     """
     ast = filtermodel_to_ast(json.loads(filter_model_json), schema)
     where_sql, params = ast_to_sql(ast, schema)
     dff = query_marches(
         where_sql=where_sql, params=params, columns=observatoire_cards_columns()
     )
-    return build_dashboard_cards(dff)
+    return build_dashboard_cards(dff, theme=theme)
 
 
 @callback(
@@ -1060,7 +1076,7 @@ def update_mode_observatoire_cards(mode_actif, filter_model, card_order):
         )
 
     track_search(json.dumps(filter_model), "tab observatoire")
-    cards = _cards_pour_filtre(_normalize_filter_model(filter_model))
+    cards = _cards_pour_filtre(_normalize_filter_model(filter_model), current_theme())
 
     # Après le cache mémoïsé de _cards_pour_filtre, jamais dedans : l'ordre
     # ferait exploser la cardinalité des entrées (#107).

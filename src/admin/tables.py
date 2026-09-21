@@ -237,20 +237,3 @@ def set_cell(table: str, pk_value, column: str, value) -> None:
             f"Ligne introuvable (table={table}, {cfg.pk}={pk_value!r}) — "
             "probablement supprimée entre-temps."
         )
-
-
-def find_changed_cell(
-    data: list[dict], data_previous: list[dict] | None
-) -> tuple[int, str, object, object] | None:
-    if data_previous is None or len(data) != len(data_previous):
-        return None
-    if not data or not data_previous:
-        return None
-    if set(data[0].keys()) != set(data_previous[0].keys()):
-        return None
-    for i, (new_row, old_row) in enumerate(zip(data, data_previous)):
-        for col, new_val in new_row.items():
-            old_val = old_row.get(col)
-            if new_val != old_val:
-                return i, col, old_val, new_val
-    return None

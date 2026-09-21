@@ -28,6 +28,7 @@ from dash import (
     page_container,
     page_registry,
 )
+from dash.exceptions import PreventUpdate
 from dotenv import load_dotenv
 from flask import Flask, Response, redirect, send_from_directory
 from flask_login import current_user
@@ -35,6 +36,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.admin.guard import is_admin
 from src.auth.setup import init_auth
+from src.theme import CLAIR, SOMBRE, current_theme, get_theme, save_theme
 from src.utils import DEVELOPMENT
 from src.utils.cache import (
     cache,
@@ -481,7 +483,14 @@ def _interpolate_index_per_request(**kwargs):
         if identity:
             kwargs["scripts"] = f"{kwargs.get('scripts', '')}\n        {identity}"
 
-    return _default_interpolate_index(**kwargs)
+    html_page = _default_interpolate_index(**kwargs)
+    # Thème posé côté serveur : pas de flash clair avant le chargement du JS.
+    # Bootstrap 5.3 bascule ses composants sur cet attribut (#118).
+    if current_theme() == SOMBRE:
+        html_page = html_page.replace(
+            '<html lang="fr">', '<html lang="fr" data-bs-theme="dark">', 1
+        )
+    return html_page
 
 
 app.interpolate_index = _interpolate_index_per_request
@@ -568,6 +577,7 @@ navbar = dbc.Navbar(
 app.layout = html.Div(
     [
         dcc.Store(id="csrf-token"),
+        dcc.Store(id="theme-enregistre"),
         navbar,
         dbc.Container(
             page_container,
@@ -642,10 +652,29 @@ def _auth_nav(_, pathname=None):
         visible_sections,
     )
 
+    abonne = current_user_has_subscription()
     sections = [
         dbc.DropdownMenuItem(section["label"], href=section["href"])
-        for section in visible_sections(current_user_has_subscription())
+        for section in visible_sections(abonne)
     ]
+    # Mode sombre réservé aux abonné·es (#118) : masqué plutôt que grisé,
+    # comme les sections réservées (#133).
+    if abonne:
+        sections.append(
+            html.Div(
+                [
+                    html.Span("☀", **{"aria-hidden": "true"}),
+                    dbc.Switch(
+                        id="theme-switch",
+                        value=get_theme(current_user.id) == SOMBRE,
+                        label="",
+                        className="theme-switch mb-0",
+                    ),
+                    html.Span("☾", **{"aria-hidden": "true"}),
+                ],
+                className="dropdown-item-text d-flex align-items-center gap-2",
+            )
+        )
     return dbc.DropdownMenu(
         label="Mon compte",
         nav=True,
@@ -660,6 +689,49 @@ def _auth_nav(_, pathname=None):
             logout_form("navbar-logout", "dropdown-item"),
         ],
     )
+
+
+@callback(
+    Output("theme-enregistre", "data"),
+    Input("theme-switch", "value"),
+    prevent_initial_call=True,
+)
+def _enregistrer_theme(sombre):
+    """Enregistre le thème choisi ; le rechargement est fait côté client.
+
+    Le switch n'est affiché qu'aux abonné·es, mais un callback se déclenche
+    aussi à la main : le droit est revérifié ici.
+    """
+    from src.pages._compte_shell import current_user_has_subscription
+
+    if not current_user.is_authenticated or not current_user_has_subscription():
+        raise PreventUpdate
+    theme = SOMBRE if sombre else CLAIR
+    # `_auth_nav` reconstruit le switch (avec sa `value` courante) à chaque
+    # changement de page : Dash déclenche alors ce callback sur ce composant
+    # nouvellement monté, sans clic, même avec `prevent_initial_call=True`
+    # (qui ne couvre que le tout premier chargement de l'app, pas la
+    # remonte ultérieure d'un composant #118). Sans ce garde-fou, chaque
+    # page réenregistrerait la même valeur et redéclencherait le
+    # rechargement côté client — boucle infinie.
+    if theme == get_theme(current_user.id):
+        raise PreventUpdate
+    save_theme(current_user.id, theme)
+    return theme
+
+
+app.clientside_callback(
+    """
+    function(theme) {
+        // Le thème s'applique côté serveur (<html>, figures) : on recharge.
+        if (theme) { window.location.reload(); }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("theme-enregistre", "id"),
+    Input("theme-enregistre", "data"),
+    prevent_initial_call=True,
+)
 
 
 @callback(

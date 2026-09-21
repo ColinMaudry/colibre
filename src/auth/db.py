@@ -210,7 +210,14 @@ def promote_pending_email(user_id: int) -> str | None:
 
 
 def delete_user(user_id: int) -> None:
-    get_conn().execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn = get_conn()
+    # `user_preferences` (thème, migration 0016) et `observatoire_card_order`
+    # (migration 0015) n'ont pas de FOREIGN KEY ... ON DELETE CASCADE vers
+    # `users` (contrairement aux tables de tokens) : sans ce nettoyage
+    # explicite, ces lignes restent orphelines après suppression du compte.
+    conn.execute("DELETE FROM user_preferences WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM observatoire_card_order WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
 
 def create_email_verification_token(

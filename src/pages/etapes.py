@@ -112,7 +112,7 @@ def build_chart():
                 _lane(
                     _bar(
                         "Approch — sourcing / préinformation (non réglementaire)",
-                        "#7c5cff",
+                        "var(--etape-approch)",
                         {"left": "2%", "right": "2%"},
                         bar_id="bar-approch",
                     ),
@@ -122,19 +122,19 @@ def build_chart():
                 _lane(
                     _bar(
                         "JAL",
-                        "#f79009",
+                        "var(--etape-jal)",
                         {"left": "40%", "right": "40%", "top": "6px", "height": "20px"},
                         bar_id="bar-jal",
                     ),
                     _bar(
                         "BOAMP",
-                        "#1570ef",
+                        "var(--etape-boamp)",
                         {"left": "40%", "right": "2%", "top": "28px", "height": "20px"},
                         bar_id="bar-boamp",
                     ),
                     _bar(
                         "JOUE — avis de marché",
-                        "#0e9384",
+                        "var(--etape-joue)",
                         {"left": "60%", "right": "2%", "top": "6px", "height": "20px"},
                         bar_id="bar-joue-marche",
                     ),
@@ -144,13 +144,13 @@ def build_chart():
                 _lane(
                     _bar(
                         "DECP — données essentielles",
-                        "#12b76a",
+                        "var(--etape-decp)",
                         {"left": "20%", "right": "2%", "top": "6px", "height": "20px"},
                         bar_id="bar-decp",
                     ),
                     _bar(
                         "JOUE — avis d'attribution",
-                        "#0e9384",
+                        "var(--etape-joue)",
                         {"left": "60%", "right": "2%", "top": "28px", "height": "20px"},
                         bar_id="bar-joue-attribution",
                     ),
@@ -179,18 +179,22 @@ STAGES_MOBILE = [
         "Programmation",
         "stage-programmation",
         [
-            ("Approch", "#7c5cff", "tous montants — publication non réglementaire"),
+            (
+                "Approch",
+                "var(--etape-approch)",
+                "tous montants — publication non réglementaire",
+            ),
         ],
     ),
     (
         "Publicité (appel d'offres)",
         "stage-publicite",
         [
-            ("JAL", "#f79009", "de 90 000 € au seuil formalisé"),
-            ("BOAMP", "#1570ef", "à partir de 90 000 €"),
+            ("JAL", "var(--etape-jal)", "de 90 000 € au seuil formalisé"),
+            ("BOAMP", "var(--etape-boamp)", "à partir de 90 000 €"),
             (
                 "JOUE — avis de marché",
-                "#0e9384",
+                "var(--etape-joue)",
                 "à partir des seuils formalisés (140 k€ / 216 k€)",
             ),
         ],
@@ -199,8 +203,16 @@ STAGES_MOBILE = [
         "Attribution",
         "stage-attribution",
         [
-            ("DECP — données essentielles", "#12b76a", "à partir de 40 000 €"),
-            ("JOUE — avis d'attribution", "#0e9384", "à partir des seuils formalisés"),
+            (
+                "DECP — données essentielles",
+                "var(--etape-decp)",
+                "à partir de 40 000 €",
+            ),
+            (
+                "JOUE — avis d'attribution",
+                "var(--etape-joue)",
+                "à partir des seuils formalisés",
+            ),
         ],
     ),
     ("Contrat", "stage-contrat", []),

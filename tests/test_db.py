@@ -13,7 +13,7 @@ from src.db import should_rebuild
 def _restore_global_db_after_module():
     """test_query_marches recharge src.db (importlib.reload) en pointant sur une
     DuckDB temporaire au schéma réduit. Sans restauration, le `conn` global de
-    src.db reste branché sur cette base et casse get_top_org_table dans les
+    src.db reste branché sur cette base et casse get_top_org_ag_grid dans les
     tests Selenium suivants (ColumnNotFoundError: titulaire_distance). On
     recharge src.db sur la base de test du conftest une fois ce module terminé."""
     yield

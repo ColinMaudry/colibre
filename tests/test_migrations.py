@@ -45,3 +45,31 @@ def test_migration_0015_is_idempotent(users_db_path):
 
     apply_pending()
     apply_pending()  # ne doit pas lever
+
+
+def test_migration_0016_creates_user_preferences(users_db_path):
+    from src.migrations import apply_pending
+
+    apply_pending()
+
+    conn = sqlite3.connect(users_db_path)
+    try:
+        tables = [
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        ]
+        assert "user_preferences" in tables
+
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(user_preferences)")]
+        assert cols == ["user_id", "theme", "updated_at"]
+    finally:
+        conn.close()
+
+
+def test_migration_0016_is_idempotent(users_db_path):
+    from src.migrations import apply_pending
+
+    apply_pending()
+    apply_pending()  # ne doit pas lever

@@ -105,14 +105,11 @@ def test_changer_de_colonnes_en_mode_observatoire_garde_len_tete_complet(
     assert len(entetes_avant) > 2, "il faut plusieurs colonnes pour que le test parle"
 
     driver.find_element(By.ID, "tableau_columns_open").click()
-    dash_duo.wait_for_element("#tableau_column_list input[type='checkbox']", timeout=8)
+    cases = "#tableau_column_list .ag-row .ag-selection-checkbox input"
+    dash_duo.wait_for_element(cases, timeout=8)
     time.sleep(1)
     cochees = [
-        c
-        for c in driver.find_elements(
-            By.CSS_SELECTOR, "#tableau_column_list input[type='checkbox']"
-        )
-        if c.is_selected()
+        c for c in driver.find_elements(By.CSS_SELECTOR, cases) if c.is_selected()
     ]
     driver.execute_script("arguments[0].scrollIntoView({block:'center'});", cochees[0])
     cochees[0].click()

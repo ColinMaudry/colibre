@@ -88,6 +88,7 @@ def test_observatoire_projette_les_colonnes_des_cards(monkeypatch):
     par un SELECT * sur les 63 colonnes du schéma."""
     from src.app import app  # noqa: F401
     from src.pages import observatoire
+    from src.theme import CLAIR
     from src.utils import data as data_module
 
     vues = {}
@@ -98,7 +99,7 @@ def test_observatoire_projette_les_colonnes_des_cards(monkeypatch):
 
     monkeypatch.setattr(observatoire, "prepare_dashboard_data", _espion)
 
-    observatoire._compute_dashboard_children.uncached(tuple())
+    observatoire._compute_dashboard_children.uncached(tuple(), CLAIR)
 
     from src.figures import observatoire_cards_columns
 

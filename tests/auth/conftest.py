@@ -17,6 +17,7 @@ def app(users_db_path, monkeypatch):
     from flask import Flask
 
     from src.auth.setup import init_auth
+    from src.migrations import apply_pending
 
     monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("LINKEDIN_CLIENT_ID", "test-client-id")
@@ -25,6 +26,12 @@ def app(users_db_path, monkeypatch):
     app = Flask(__name__)
     app.config["WTF_CSRF_ENABLED"] = False
     init_auth(app)
+    # Comme en production (init_subscriptions, appelé après init_auth, pairant
+    # toujours db.init_schema() + apply_pending()) : sans ça, user_preferences
+    # et observatoire_card_order (migrations 0015/0016) n'existent pas, et
+    # delete_user (route /auth/delete-account, échec d'envoi à l'inscription)
+    # lève sqlite3.OperationalError.
+    apply_pending()
     yield app
 
 
@@ -40,6 +47,7 @@ def csrf_app(users_db_path, monkeypatch):
     from flask_wtf.csrf import generate_csrf
 
     from src.auth.setup import init_auth
+    from src.migrations import apply_pending
 
     monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("LINKEDIN_CLIENT_ID", "test-client-id")
@@ -48,6 +56,7 @@ def csrf_app(users_db_path, monkeypatch):
 
     app = Flask(__name__)
     init_auth(app)
+    apply_pending()  # même raison que la fixture `app` ci-dessus
 
     @app.route("/_test/csrf")
     def _test_csrf():

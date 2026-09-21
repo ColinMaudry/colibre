@@ -419,6 +419,28 @@ def get_default_hidden_columns(page):
     return hidden_columns
 
 
+def hidden_columns_from_selection(selected_rows):
+    """Colonnes masquées déduites des lignes cochées du sélecteur (AG Grid).
+
+    [] (tout décoché) est un choix explicite : toutes les colonnes masquées.
+
+    Accepte aussi la forme `{"ids": [...]}` posée par le serveur
+    (selection_from_hidden_columns) : Dash chaîne ce callback sur cette
+    écriture avant qu'AG Grid ne réémette la sélection en lignes.
+    """
+    if isinstance(selected_rows, dict):
+        selected = set(selected_rows.get("ids") or [])
+    else:
+        selected = {row["id"] for row in (selected_rows or [])}
+    return [col for col in COLUMNS if col not in selected]
+
+
+def selection_from_hidden_columns(hidden_columns):
+    """Valeur de `selectedRows` cochant les colonnes visibles (par id de ligne)."""
+    hidden = set(hidden_columns)
+    return {"ids": [col for col in COLUMNS if col not in hidden]}
+
+
 def postprocess_page(dff: pl.DataFrame) -> pl.DataFrame:
     """Post-traitement à appliquer sur une page déjà paginée.
 
