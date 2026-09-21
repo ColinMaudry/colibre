@@ -37,6 +37,31 @@ def _result_column_defs(dff: pl.DataFrame) -> list[dict]:
 
 
 @cache.memoize(timeout=12 * 60 * 60)
+def _vignette(nom: str, cible: str) -> html.Span:
+    """Vignette de l'accueil, en deux versions : thème clair et thème sombre.
+
+    Les deux images sont dans la page ; le CSS (`.vignette-claire` /
+    `.vignette-sombre` dans style.css) n'en affiche qu'une selon
+    `data-bs-theme`. Un simple `html.Img` piloté par callback clignoterait au
+    chargement, le temps que le callback réponde, et le thème est déjà posé
+    côté serveur sur `<html>` (cf. #118).
+    """
+    return html.Span(
+        [
+            html.Img(
+                src=f"/assets/{nom}-thumbnail.png",
+                alt=f"Aperçu de {cible}",
+                className="vignette-claire",
+            ),
+            html.Img(
+                src=f"/assets/{nom}-thumbnail-dark.png",
+                alt=f"Aperçu de {cible}",
+                className="vignette-sombre",
+            ),
+        ]
+    )
+
+
 def _tagline_stats() -> tuple[str, str, str]:
     nb_acheteurs = format_number(round(DF_ACHETEURS.height, -3))
     nb_titulaires = format_number(round(DF_TITULAIRES.height, -3))
@@ -119,7 +144,7 @@ home_intro = html.Div(
                 dbc.Col(
                     [
                         dcc.Link(
-                            html.Img(src="/assets/table-thumbnail.png"), href="/tableau"
+                            _vignette("table", "le tableau de données"), href="/tableau"
                         ),
                     ],
                     md=5,
@@ -128,7 +153,7 @@ home_intro = html.Div(
                 dbc.Col(
                     [
                         dcc.Link(
-                            html.Img(src="/assets/dashboard-thumbnail.png"),
+                            _vignette("dashboard", "l'observatoire"),
                             href="/observatoire",
                         ),
                     ],

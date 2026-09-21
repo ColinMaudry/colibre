@@ -1754,3 +1754,16 @@ input[type="number"] {
 [data-bs-theme="dark"] .ag-row.champ-cible {
   background-color: rgba(224, 108, 87, 0.28);
 }
+
+/* Vignettes de l'accueil : la version sombre remplace la claire selon le
+   thème. On ne peut pas utiliser les utilitaires d-none/d-block de Bootstrap,
+   qui posent display en !important sans distinguer les thèmes. */
+.vignette-sombre {
+  display: none;
+}
+[data-bs-theme="dark"] .vignette-claire {
+  display: none;
+}
+[data-bs-theme="dark"] .vignette-sombre {
+  display: inline;
+}
