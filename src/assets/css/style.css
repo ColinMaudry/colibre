@@ -1529,6 +1529,14 @@ input[type="number"] {
   border-color: var(--earth-border);
 }
 
+/* Bordures des cards et du menu de nav */
+[data-bs-theme="dark"] .navbar {
+  border-color: var(--earth-border);
+}
+[data-bs-theme="dark"] .card {
+  border-color: var(--earth-border);
+}
+
 /* Info de comptage sous la barre d'outils du tableau + rappel terracotta du
    téléchargement bloqué */
 [data-bs-theme="dark"] .table-meta {
