@@ -17,6 +17,7 @@ from polars.exceptions import ColumnNotFoundError
 from src.db import schema
 from src.theme import SOMBRE, current_theme
 from src.utils import logger
+from src.utils.cache import cache
 from src.utils.data import DATA_SCHEMA, DEPARTEMENTS_GEOJSON, schema_field_rows
 from src.utils.table import add_links, format_number
 
@@ -169,11 +170,33 @@ def get_barchart_sources(lff: pl.LazyFrame, type_date: str, theme: str | None = 
     return graph
 
 
+# Fichiers distants (data.gouv.fr) régénérés au plus une fois par jour : sans
+# cache, chaque visite de /projet/donnees les retéléchargeait (~0,9 s cumulées).
+# Une exception n'est pas mise en cache, un échec réseau est donc retenté.
+DUREE_CACHE_SOURCES = 6 * 60 * 60
+
+
+@cache.memoize(timeout=DUREE_CACHE_SOURCES)
+def _lire_stats_sources(source_path: str) -> pl.DataFrame:
+    return pl.read_csv(source_path)
+
+
+@cache.memoize(timeout=DUREE_CACHE_SOURCES)
+def _lire_matrice_doublons() -> pl.DataFrame:
+    lff = pl.scan_parquet(
+        "https://www.data.gouv.fr/api/1/datasets/r/a545bf6c-8b24-46ed-b49f-a32bf02eaffa"
+    ).sort("sourceDataset")
+    lff = lff.select(
+        ["sourceDataset", "unique"] + sorted(lff.collect_schema().names()[2:])
+    )
+    return lff.collect()
+
+
 def get_sources_tables(source_path) -> html.Div:
     try:
         if not source_path:
             raise ValueError("SOURCE_STATS_CSV_PATH non défini")
-        dff = pl.read_csv(source_path)
+        dff = _lire_stats_sources(source_path)
     except Exception as e:
         logger.warning(f"Sources de données indisponibles ({e})")
         return html.Div("Sources de données momentanément indisponibles.")
@@ -338,14 +361,7 @@ def get_duplicate_matrix(theme: str | None = None) -> dcc.Graph:
     :return:
     """
     theme = _theme(theme)
-    lff = pl.scan_parquet(
-        "https://www.data.gouv.fr/api/1/datasets/r/a545bf6c-8b24-46ed-b49f-a32bf02eaffa"
-    ).sort("sourceDataset")
-    lff = lff.select(
-        ["sourceDataset", "unique"] + sorted(lff.collect_schema().names()[2:])
-    )
-
-    dff = lff.collect()
+    dff = _lire_matrice_doublons()
 
     # Extract data
     z_data = dff.select(pl.all().exclude("sourceDataset")).fill_null(0).to_numpy()

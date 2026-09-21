@@ -1,5 +1,29 @@
 import os
 
+import pytest
+
+
+@pytest.fixture(scope="module")
+def flask_app():
+    """App Flask minimale avec SimpleCache pour que @cache.memoize() fonctionne
+    (même pattern que tests/test_grid.py)."""
+    from flask import Flask
+
+    from src.utils.cache import cache
+
+    app = Flask(__name__)
+    cache.init_app(app, config={"CACHE_TYPE": "SimpleCache"})
+    return app
+
+
+@pytest.fixture(autouse=True)
+def reset_cache(flask_app):
+    from src.utils.cache import cache
+
+    with flask_app.app_context():
+        cache.clear()
+        yield
+
 
 def test_update_timestamp_falls_back_to_db_mtime(tmp_path, monkeypatch):
     import src.utils as u
