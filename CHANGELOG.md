@@ -1,6 +1,7 @@
 #### 3.2.0
 
 - Possiblité de réordonner les tuiles de l'observatoire (réservé aux abonné·es) ([#107](https://github.com/colinmaudry/colibre/issues/107))
+- Mode sombre pour l'interface (réservé aux abonné·es) ([#118](https://github.com/colinmaudry/colibre/issues/118))
 - Amélioration de la visibilité des abonnements
 
 #### 3.1.0
