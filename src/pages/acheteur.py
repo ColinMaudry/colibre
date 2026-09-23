@@ -4,6 +4,7 @@ import json
 import dash_bootstrap_components as dbc
 import polars as pl
 from dash import (
+    MATCH,
     Input,
     Output,
     State,
@@ -18,7 +19,6 @@ from src.db import aggregate_marches, count_marches, query_marches, schema
 from src.figures import (
     get_distance_histogram,
     get_org_location_map,
-    get_top_org_ag_grid,
     make_card,
     make_column_picker,
 )
@@ -32,6 +32,12 @@ from src.utils.table import (
     hidden_columns_from_selection,
     selection_from_hidden_columns,
     write_styled_excel,
+)
+from src.utils.top_org_grid import (
+    GRID_TYPE,
+    fetch_top_org_page,
+    scope_key,
+    top_org_grid,
 )
 from src.utils.tracking import track_download
 
@@ -397,16 +403,37 @@ def update_download_button_acheteur(pathname, ach_year):
     Input(component_id="acheteur_year", component_property="value"),
 )
 def get_top_titulaires(pathname, ach_year):
-    where_sql, params = _acheteur_scope(pathname, ach_year)
-    table = get_top_org_ag_grid(
-        query_marches(where_sql, params).lazy(),
+    # La grille ne porte plus le classement : ses lignes arrivent par le
+    # datasource ci-dessous, une page à la fois (#142).
+    grille = top_org_grid(
+        "acheteur",
         "titulaire",
+        scope_key(pathname, ach_year),
         ["titulaire_distance"],
-        # Toutes les organisations : le filtre texte de la grille doit
-        # trouver celles au-delà du 100e rang.
-        limit=None,
     )
-    return make_card(fig=table, title="Top titulaires", lg=12, xl=12)
+    return make_card(fig=grille, title="Top titulaires", lg=12, xl=12)
+
+
+@callback(
+    Output(
+        {"type": GRID_TYPE, "context": "acheteur", "org_type": MATCH, "scope": MATCH},
+        "getRowsResponse",
+    ),
+    Input(
+        {"type": GRID_TYPE, "context": "acheteur", "org_type": MATCH, "scope": MATCH},
+        "getRowsRequest",
+    ),
+    State(component_id="acheteur_url", component_property="pathname"),
+    State(component_id="acheteur_year", component_property="value"),
+    prevent_initial_call=True,
+)
+def get_top_titulaires_rows(request, pathname, ach_year):
+    if request is None or not pathname:
+        return no_update
+    where_sql, params = _acheteur_scope(pathname, ach_year)
+    return fetch_top_org_page(
+        "titulaire", where_sql, params, request, ["titulaire_distance"]
+    )
 
 
 @callback(
