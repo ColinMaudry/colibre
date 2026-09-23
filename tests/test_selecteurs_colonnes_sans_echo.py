@@ -1,6 +1,6 @@
 """Le liage store ⇄ cases sur les autres sélecteurs de colonnes (#139).
 
-Aucune de ces trois pages n'a aujourd'hui de second écrivain de son store, donc
+Aucune de ces deux pages n'a aujourd'hui de second écrivain de son store, donc
 l'écho n'y écrase rien — le bug de #139 ne les touche pas. Mais il part quand
 même à chaque chargement : un aller-retour serveur pour rien, et la course
 réapparaîtrait le jour où un second écrivain serait ajouté (des vues
@@ -22,12 +22,6 @@ SELECTEURS = [
         "titulaire_column_list",
         "titulaire_columns",
         "titulaire-hidden-columns",
-    ),
-    (
-        "observatoire",
-        "observatoire_preview_column_list",
-        "observatoire-preview-columns-modal",
-        "observatoire-hidden-columns",
     ),
 ]
 
@@ -64,7 +58,6 @@ def test_aucun_declencheur_permanent(module, cases, modale, store):
 RECHERCHES = [
     ("acheteur", "acheteur_column_list", "acheteur"),
     ("titulaire", "titulaire_column_list", "titulaire"),
-    ("observatoire", "observatoire_preview_column_list", "observatoire_preview"),
 ]
 
 
@@ -97,7 +90,6 @@ PAGES_DU_STORE = [
     ("tableau", "tableau"),
     ("acheteur", "acheteur"),
     ("titulaire", "titulaire"),
-    ("observatoire", "tableau"),
 ]
 
 
@@ -167,19 +159,3 @@ def test_selection_differente_ecrit_la_nouvelle_liste(module, page):
     assert cb([], [COLUMNS[1]]) == COLUMNS
     # Tout cocher depuis un store non vide : plus rien de masqué.
     assert cb(_lignes_cochees([]), [COLUMNS[1]]) == []
-
-
-def test_apercu_observatoire_sans_preference_masque_le_defaut():
-    """Store à None (première visite) : l'aperçu doit masquer les mêmes colonnes
-    que celles que la modale décoche, soit le défaut « tableau ». Sinon il
-    affiche tout, et le premier décochage le fait sauter à « défaut moins une »."""
-    from src.utils.table import COLUMNS, get_default_hidden_columns
-
-    store_hidden_columns = _module("observatoire").store_hidden_columns
-    defaut = get_default_hidden_columns("tableau")
-    assert defaut, "défaut vide : rien ne serait testé"
-
-    assert store_hidden_columns(None) == defaut
-    # [] est un choix explicite : tout afficher.
-    assert store_hidden_columns([]) == []
-    assert store_hidden_columns([COLUMNS[2]]) == [COLUMNS[2]]
