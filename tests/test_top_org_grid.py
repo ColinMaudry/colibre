@@ -81,6 +81,16 @@ def test_filtre_attributions_deux_conditions():
     assert having_params == [2, 9]
 
 
+def test_filtre_attributions_valeur_decimale_non_tronquee():
+    """AG Grid autorise une décimale ; elle ne doit pas être tronquée (5.5 -> 5)."""
+    _, _, having_sql, having_params = top_org_filter_sql(
+        {AGG_COLUMN: {"filterType": "number", "type": "lessThan", "filter": 5.5}},
+        "titulaire",
+    )
+    assert having_sql == "(COUNT(*) < ?)"
+    assert having_params == [5.5]
+
+
 def test_filtre_attributions_valeur_non_numerique_ignoree():
     _, _, having_sql, having_params = top_org_filter_sql(
         {AGG_COLUMN: {"filterType": "number", "type": "greaterThan", "filter": "abc"}},

@@ -44,23 +44,30 @@ def group_columns(org_type: str, extra_columns=()) -> list[str]:
     return [c for c in cols if c in schema.names()]
 
 
-def _to_int(value):
+def _to_number(value):
+    """Convertit en nombre sans tronquer (AG Grid autorise une décimale sur
+    un filtre numérique : `int()` tronquerait silencieusement 5.5 en 5, ce
+    qui fausserait le filtre sans avertissement). Rend un `int` quand la
+    valeur est entière, pour garder les paramètres liés usuels (`[5]`)."""
     try:
-        return int(value)
+        number = float(value)
     except (TypeError, ValueError):
-        logger.warning(f"Filtre {AGG_COLUMN} : valeur non entière ignorée ({value!r})")
+        logger.warning(
+            f"Filtre {AGG_COLUMN} : valeur non numérique ignorée ({value!r})"
+        )
         return None
+    return int(number) if number.is_integer() else number
 
 
 def _having_leaf(cond: dict) -> tuple[str, list]:
     op = cond.get("type")
     if op == "inRange":
-        low, high = _to_int(cond.get("filter")), _to_int(cond.get("filterTo"))
+        low, high = _to_number(cond.get("filter")), _to_number(cond.get("filterTo"))
         if low is None or high is None:
             return "", []
         return f"{_AGG_SQL} BETWEEN ? AND ?", [low, high]
     sql_op = _NUM_OPS.get(op)
-    value = _to_int(cond.get("filter"))
+    value = _to_number(cond.get("filter"))
     if sql_op is None or value is None:
         if sql_op is None:
             logger.warning(f"Filtre {AGG_COLUMN} : opérateur ignoré ({op!r})")
