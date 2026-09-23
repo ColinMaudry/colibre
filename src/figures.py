@@ -12,14 +12,13 @@ import plotly.graph_objects as go
 import polars as pl
 from dash import MATCH, Input, State, clientside_callback, dash_table, dcc, html
 from dash_extensions.javascript import Namespace
-from polars.exceptions import ColumnNotFoundError
 
 from src.db import schema
 from src.theme import SOMBRE, current_theme
 from src.utils import logger
 from src.utils.cache import cache
 from src.utils.data import DATA_SCHEMA, DEPARTEMENTS_GEOJSON, schema_field_rows
-from src.utils.table import add_links, format_number
+from src.utils.table import format_number
 
 ORG_COLORS = {
     "acheteur": "#E69F00",  # orange
@@ -1275,97 +1274,6 @@ def make_schema_grid():
             "sortable": False,
             "floatingFilter": True,
         },
-    )
-
-
-def _top_org_aggregate(data, org_type: str, extra_columns: list):
-    """Agrégation « top N » utilisée par get_top_org_ag_grid.
-
-    Renvoie le DataFrame agrégé (colonnes castées en str, tri par Attributions
-    décroissant), AVANT add_links, ou None si vide/colonne manquante.
-    """
-    if isinstance(data, pl.LazyFrame):
-        lff = data
-    else:
-        lff = pl.LazyFrame(data, strict=False, infer_schema_length=5000)
-
-    extra = list(extra_columns)  # copie : ne pas muter la liste du caller
-    if org_type == "titulaire":
-        extra.append("titulaire_typeIdentifiant")
-    columns = ["uid", f"{org_type}_id", f"{org_type}_nom"] + extra
-
-    lff = lff.select(columns)
-    lff = lff.group_by([f"{org_type}_id", f"{org_type}_nom"] + extra).agg(
-        pl.len().alias("Attributions")
-    )
-    lff = lff.sort(by="Attributions", descending=True, nulls_last=True)
-    lff = lff.cast(pl.String)
-    lff = lff.fill_null("")
-
-    try:
-        dff: pl.DataFrame = lff.collect(engine="streaming")
-    except ColumnNotFoundError as e:
-        # Ne pas rappeler lff.collect_schema() ici : sur le même plan lazy
-        # cassé, la résolution du schéma lève à nouveau ColumnNotFoundError
-        # (non rattrapée), au lieu de renvoyer None comme prévu.
-        logger.warning(f"_top_org_aggregate: column not found. {e}")
-        return None
-    return dff if dff.height > 0 else None
-
-
-def get_top_org_ag_grid(
-    data,
-    org_type: str,
-    extra_columns: list,
-    filters: bool = True,
-    limit: int | None = 100,
-):
-    """Top N acheteurs/titulaires en AG Grid client-side (rowData directe).
-
-    Rendu AG Grid (thème brique, liens markdown). html.Div() si vide/erreur.
-
-    La pagination d'AG Grid en mode client-side est côté client : toutes les
-    lignes passées à `rowData` transitent par le navigateur, même si seules
-    `page_size` sont visibles. Sans `limit`, l'observatoire expédierait ainsi
-    82 934 titulaires (33,6 Mo de JSON) pour en afficher 10. L'agrégat étant
-    déjà trié par nombre d'attributions décroissant, tronquer conserve bien
-    les mieux classés. `limit=None` restaure l'envoi intégral.
-    """
-    dff = _top_org_aggregate(data, org_type, extra_columns)
-    if dff is None:
-        return html.Div()
-
-    if limit is not None:
-        dff = dff.head(limit)
-
-    dff = add_links(dff)
-
-    # columnDefs : on masque l'id (lien porté par le nom), on rend le nom en
-    # markdown (HTML <a>), on cache les colonnes techniques *_tooltip.
-    id_col = f"{org_type}_id"
-    nom_col = f"{org_type}_nom"
-    link_cols = {nom_col}
-    column_defs = []
-    for col in dff.columns:
-        if col == id_col or col.endswith("_tooltip"):
-            continue
-        col_def = {
-            "field": col,
-            "headerName": DATA_SCHEMA.get(col, {}).get("title", col),
-            "sortable": True,
-            "filter": "agTextColumnFilter" if filters else False,
-        }
-        if col in link_cols:
-            col_def["cellRenderer"] = "markdown"
-            col_def["flex"] = 1
-        column_defs.append(col_def)
-
-    return client_grid(
-        f"top10_{org_type}",
-        column_defs,
-        dff.to_dicts(),
-        page_size=10,
-        columnSize="responsiveSizeToFit",
     )
 
 
