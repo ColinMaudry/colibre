@@ -10,9 +10,14 @@ callbacks de datasource vivent dans les pages, qui savent reconstruire leur
 périmètre SQL (cf. src/utils/entity_grid.py, même découpage).
 """
 
-from src.db import schema
+import polars as pl
+from dash import no_update
+
+from src.db import aggregate_marches, count_aggregate, schema
 from src.utils import logger
+from src.utils.cache import cache
 from src.utils.query_ast import ast_to_sql, filtermodel_to_ast
+from src.utils.table import add_links
 
 #: Nom de la colonne agrégée, affichée telle quelle dans la grille.
 AGG_COLUMN = "Attributions"
@@ -142,3 +147,86 @@ def top_org_sort_sql(sort_model, org_type: str, extra_columns=()) -> str:
         fragments.append(f'"{AGG_COLUMN}" DESC')
     fragments.append(f'"{org_type}_id" ASC')
     return ", ".join(fragments)
+
+
+def _select_and_group(org_type: str, extra_columns=()) -> tuple[str, str]:
+    """Fragments SELECT et GROUP BY partagés par le COUNT et la page."""
+    group_by = ", ".join(f'"{c}"' for c in group_columns(org_type, extra_columns))
+    return f'{group_by}, {_AGG_SQL} AS "{AGG_COLUMN}"', group_by
+
+
+@cache.memoize()
+def _cached_top_count(select_sql, where_sql, params, group_by, having) -> int:
+    """COUNT des groupes, mémoïsé sur la requête.
+
+    AG Grid redemande le total à chaque bloc ; pour un même filtre tous les
+    blocs partagent la même requête (cf. `_cached_count` dans
+    src/utils/grid.py, même raison).
+    """
+    return count_aggregate(
+        select_sql=select_sql,
+        where_sql=where_sql,
+        params=params,
+        group_by=group_by,
+        having=having,
+    )
+
+
+def _rows_with_links(dff: pl.DataFrame) -> list[dict]:
+    """Lignes prêtes pour la grille : textes non nuls, liens HTML posés.
+
+    Seules les colonnes texte sont castées : `Attributions` et
+    `titulaire_distance` restent numériques, pour que la grille les affiche
+    et les aligne comme des nombres.
+
+    `add_links` pose aussi un lien sur les colonnes `*_id` (même comportement
+    que `postprocess_page` pour la grille détail) ; on restitue leur valeur
+    brute après coup, l'identifiant devant rester exploitable tel quel (clé
+    de ligne, dédoublonnage de pagination) — le lien vers la fiche est déjà
+    porté par la colonne `*_nom`.
+    """
+    if dff.height == 0:
+        return []
+    texte = [c for c, dtype in dff.schema.items() if dtype == pl.String]
+    dff = dff.with_columns([pl.col(c).fill_null("") for c in texte])
+    id_columns = [c for c in dff.columns if c.endswith("_id")]
+    bruts = dff.select(id_columns)
+    dff = add_links(dff)
+    if id_columns:
+        dff = dff.with_columns([bruts.get_column(c).alias(c) for c in id_columns])
+    return dff.to_dicts()
+
+
+def fetch_top_org_page(org_type, where_sql, params, request, extra_columns=()):
+    """Datasource server-side d'une grille top, scopée par (where_sql, params).
+
+    Renvoie {"rowData": ..., "rowCount": <nombre de groupes>}, ou `no_update`
+    si AG Grid n'a pas (encore) envoyé de requête.
+    """
+    if request is None:
+        return no_update
+
+    select_sql, group_by = _select_and_group(org_type, extra_columns)
+    filter_sql, filter_params, having_sql, having_params = top_org_filter_sql(
+        request.get("filterModel"), org_type, extra_columns
+    )
+    scoped_where = f"({where_sql}) AND ({filter_sql})"
+    query_params = [*params, *filter_params, *having_params]
+
+    total = _cached_top_count(
+        select_sql, scoped_where, tuple(query_params), group_by, having_sql or None
+    )
+
+    start = int(request.get("startRow", 0))
+    end = int(request.get("endRow", start))
+    dff = aggregate_marches(
+        select_sql=select_sql,
+        where_sql=scoped_where,
+        params=query_params,
+        group_by=group_by,
+        having=having_sql or None,
+        order_by=top_org_sort_sql(request.get("sortModel"), org_type, extra_columns),
+        limit=max(0, end - start),
+        offset=start,
+    )
+    return {"rowData": _rows_with_links(dff), "rowCount": total}

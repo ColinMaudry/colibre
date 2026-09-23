@@ -1,11 +1,205 @@
 """Grilles « Top acheteurs / Top titulaires » paginées côté serveur (#142)."""
 
+import duckdb
+import pytest
+from dash import no_update
+
+import src.db as db_module
+import src.utils.top_org_grid as top_module
 from src.utils.top_org_grid import (
     AGG_COLUMN,
+    fetch_top_org_page,
     group_columns,
     top_org_filter_sql,
     top_org_sort_sql,
 )
+
+
+@pytest.fixture(scope="module")
+def flask_app():
+    """App Flask minimale pour que @cache.memoize() fonctionne (même pattern
+    que tests/test_grid.py)."""
+    from flask import Flask
+
+    from src.utils.cache import cache
+
+    app = Flask(__name__)
+    cache.init_app(app, config={"CACHE_TYPE": "SimpleCache"})
+    return app
+
+
+@pytest.fixture(autouse=True)
+def reset_cache(flask_app):
+    from src.utils.cache import cache
+
+    with flask_app.app_context():
+        try:
+            cache.clear()
+        except (RuntimeError, AttributeError):
+            pass
+        yield
+
+
+@pytest.fixture
+def decp_synthetique(monkeypatch):
+    """Table `decp` en mémoire : 30 titulaires, l'organisation i ayant
+    30 - i attributions (classement strictement décroissant, donc
+    déterministe). La base de test partagée ne contient qu'une seule ligne :
+    ni le classement, ni la pagination n'y seraient observables.
+    """
+    conn = duckdb.connect(":memory:")
+    lignes = []
+    for i in range(30):
+        for j in range(30 - i):
+            lignes.append(
+                f"('m{i}-{j}', 'T{i:03d}', 'Organisation {i:03d}', 'SIRET', {i})"
+            )
+    conn.execute(
+        "CREATE TABLE decp AS SELECT * FROM (VALUES " + ",".join(lignes) + ") AS t("
+        "uid, titulaire_id, titulaire_nom, titulaire_typeIdentifiant, titulaire_distance)"
+    )
+    monkeypatch.setattr(db_module, "get_cursor", lambda: conn)
+    yield conn
+    conn.close()
+
+
+def _request(start=0, end=10, filter_model=None, sort_model=None):
+    return {
+        "startRow": start,
+        "endRow": end,
+        "filterModel": filter_model,
+        "sortModel": sort_model,
+    }
+
+
+def test_fetch_page_renvoie_lignes_et_total(flask_app, decp_synthetique):
+    with flask_app.app_context():
+        response = fetch_top_org_page("titulaire", "TRUE", [], _request())
+
+    assert response["rowCount"] == 30  # nombre de groupes, pas de lignes
+    assert len(response["rowData"]) == 10
+    # Tri par défaut : l'organisation 000 a le plus d'attributions.
+    assert response["rowData"][0]["Attributions"] == 30
+    # add_links a posé un lien vers la fiche.
+    assert '<a href = "/titulaires/T000">' in response["rowData"][0]["titulaire_nom"]
+
+
+def test_fetch_page_offset_sans_doublon(flask_app, decp_synthetique):
+    with flask_app.app_context():
+        page1 = fetch_top_org_page("titulaire", "TRUE", [], _request(0, 10))
+        page2 = fetch_top_org_page("titulaire", "TRUE", [], _request(10, 20))
+
+    ids1 = [r["titulaire_id"] for r in page1["rowData"]]
+    ids2 = [r["titulaire_id"] for r in page2["rowData"]]
+    assert len(set(ids1) & set(ids2)) == 0
+    assert ids1 == [f"T{i:03d}" for i in range(10)]
+
+
+def test_fetch_page_filtre_trouve_au_dela_du_10e_rang(flask_app, decp_synthetique):
+    """Le cœur de #142 : le filtre porte sur tout le classement, pas sur la
+    page affichée ni sur un top tronqué."""
+    filtre = {
+        "titulaire_nom": {"filterType": "text", "type": "contains", "filter": "025"}
+    }
+    with flask_app.app_context():
+        response = fetch_top_org_page("titulaire", "TRUE", [], _request(0, 10, filtre))
+
+    assert response["rowCount"] == 1
+    assert response["rowData"][0]["titulaire_id"] == "T025"
+
+
+def test_fetch_page_having_sur_attributions(flask_app, decp_synthetique):
+    filtre = {
+        "Attributions": {"filterType": "number", "type": "greaterThan", "filter": 25}
+    }
+    with flask_app.app_context():
+        response = fetch_top_org_page("titulaire", "TRUE", [], _request(0, 10, filtre))
+
+    assert response["rowCount"] == 5  # 30, 29, 28, 27, 26
+    assert all(row["Attributions"] > 25 for row in response["rowData"])
+
+
+def test_fetch_page_tri_numerique_pas_lexicographique(flask_app, decp_synthetique):
+    """9 doit rester inférieur à 10 : l'ancienne grille comparait des chaînes."""
+    tri = [{"colId": "Attributions", "sort": "asc"}]
+    with flask_app.app_context():
+        response = fetch_top_org_page(
+            "titulaire", "TRUE", [], _request(0, 5, sort_model=tri)
+        )
+
+    valeurs = [row["Attributions"] for row in response["rowData"]]
+    assert valeurs == [1, 2, 3, 4, 5]
+
+
+def test_fetch_page_respecte_le_perimetre(flask_app, decp_synthetique):
+    with flask_app.app_context():
+        response = fetch_top_org_page(
+            "titulaire", "titulaire_id = ?", ["T003"], _request()
+        )
+
+    assert response["rowCount"] == 1
+    assert response["rowData"][0]["titulaire_id"] == "T003"
+
+
+def test_fetch_page_compte_mis_en_cache_entre_les_pages(
+    flask_app, decp_synthetique, monkeypatch
+):
+    """Régression : un COUNT par page rendrait la pagination deux fois plus
+    coûteuse (même raison que _cached_count dans src/utils/grid.py)."""
+    appels = {"n": 0}
+    vrai_count = top_module.count_aggregate
+
+    def compter(*args, **kwargs):
+        appels["n"] += 1
+        return vrai_count(*args, **kwargs)
+
+    monkeypatch.setattr(top_module, "count_aggregate", compter)
+
+    with flask_app.app_context():
+        fetch_top_org_page("titulaire", "TRUE", [], _request(0, 10))
+        fetch_top_org_page("titulaire", "TRUE", [], _request(10, 20))
+        fetch_top_org_page("titulaire", "TRUE", [], _request(20, 30))
+
+    assert appels["n"] == 1
+
+
+def test_fetch_page_sans_request():
+    assert fetch_top_org_page("titulaire", "TRUE", [], None) is no_update
+
+
+def test_fetch_page_perimetre_vide(flask_app, decp_synthetique):
+    with flask_app.app_context():
+        response = fetch_top_org_page(
+            "titulaire", "titulaire_id = ?", ["INCONNU"], _request()
+        )
+
+    assert response == {"rowData": [], "rowCount": 0}
+
+
+def test_fetch_page_perimetre_et_having_ordonnes(flask_app, decp_synthetique):
+    """Comble un trou de couverture de la tâche 1 : un périmètre à paramètre
+    lié (WHERE) combiné à un filtre sur la colonne agrégée (HAVING) doit lier
+    ses paramètres dans l'ordre WHERE puis HAVING. Si l'ordre était inversé,
+    la valeur numérique du HAVING (15) se retrouverait liée au `?` du LIKE
+    (une chaîne attendue), ce qui ferait échouer la requête ou la fausserait
+    silencieusement.
+    """
+    filtre = {AGG_COLUMN: {"filterType": "number", "type": "greaterThan", "filter": 15}}
+    with flask_app.app_context():
+        response = fetch_top_org_page(
+            "titulaire",
+            "titulaire_nom LIKE ?",
+            ["Organisation 01%"],
+            _request(0, 10, filtre),
+        )
+
+    # Périmètre : organisations 010 à 019 (10 orgs, Attributions 20..11).
+    # HAVING : Attributions > 15 -> restreint à 010..014 (20,19,18,17,16).
+    assert response["rowCount"] == 5
+    assert {row["titulaire_id"] for row in response["rowData"]} == {
+        f"T{i:03d}" for i in range(10, 15)
+    }
+    assert all(row["Attributions"] > 15 for row in response["rowData"])
 
 
 def test_group_columns_titulaire_inclut_type_identifiant():
