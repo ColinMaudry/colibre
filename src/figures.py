@@ -1421,6 +1421,7 @@ AG_GRID_LOCALE_FR = {
     "andCondition": "ET",
     "orCondition": "OU",
     "noRowsToShow": "Aucune ligne à afficher",
+    "noMatchingRows": "Aucune ligne ne correspond aux filtres appliqués",
     "loadingOoo": "Chargement...",
 }
 
