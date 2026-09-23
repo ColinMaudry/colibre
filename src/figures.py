@@ -1566,7 +1566,11 @@ def observatoire_cards_columns() -> list[str]:
 
 
 def build_dashboard_cards(
-    dff: pl.DataFrame, order: list[str] | None = None, theme: str | None = None
+    dff: pl.DataFrame,
+    order: list[str] | None = None,
+    theme: str | None = None,
+    context: str = "observatoire",
+    scope: str = "",
 ) -> list:
     """Cards de l'observatoire pour un jeu de marchés déjà filtré.
 
@@ -1584,6 +1588,12 @@ def build_dashboard_cards(
 
     `theme` (#118) est résolu une seule fois ici et transmis à toutes les
     figures construites, pour éviter un appel current_theme() par figure.
+
+    `context` distingue les deux appelants (`observatoire` / `tableau`) :
+    chacun déclare son propre callback de datasource pour les grilles top, et
+    deux pages ne peuvent pas alimenter la même sortie. `scope` identifie le
+    périmètre courant et force le remontage des grilles quand il change (cf.
+    `src.utils.top_org_grid.scope_key`).
     """
     theme = _theme(theme)
     lff = dff.lazy()
@@ -1660,9 +1670,11 @@ def build_dashboard_cards(
         )
     )
 
-    top_acheteurs = get_top_org_ag_grid(
-        lff, org_type="acheteur", extra_columns=[], filters=False
-    )
+    # Import local : src.utils.top_org_grid importe le thème AG Grid depuis ce
+    # module, un import en tête créerait un cycle.
+    from src.utils.top_org_grid import top_org_grid
+
+    top_acheteurs = top_org_grid(context, "acheteur", scope)
     cards.append(
         make_card(
             title="Top acheteurs",
@@ -1673,9 +1685,7 @@ def build_dashboard_cards(
         )
     )
 
-    top_titulaires = get_top_org_ag_grid(
-        lff, org_type="titulaire", extra_columns=[], filters=False
-    )
+    top_titulaires = top_org_grid(context, "titulaire", scope)
     cards.append(
         make_card(
             title="Top titulaires",

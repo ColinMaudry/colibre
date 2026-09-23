@@ -674,16 +674,19 @@ def test_build_dashboard_cards_assigns_card_ids():
         assert expected_id in ids, f"card_id manquant : {expected_id}"
 
 
-def test_build_dashboard_cards_top_org_cards_use_ag_grid():
-    """Les cards top-acheteurs/top-titulaires passent en AG Grid (#141) : fini
-    le DataTable, dont le dark mode dépend d'un CSS spécifique."""
+def test_build_dashboard_cards_top_org_cards_sont_paginees_serveur():
+    """Les cards top passent en modèle infinite (#142) : plus de classement
+    embarqué dans la page, donc plus de troncature à 100 lignes."""
     import dash_ag_grid as dag
     from dash import dash_table
 
     build_dashboard_cards, dff = _cards_de_test()
-    cards = build_dashboard_cards(dff)
+    cards = build_dashboard_cards(dff, context="observatoire", scope="abc123")
 
-    for card_id in ("top-acheteurs", "top-titulaires"):
+    for card_id, org_type in (
+        ("top-acheteurs", "acheteur"),
+        ("top-titulaires", "titulaire"),
+    ):
         card = next(
             c
             for c in cards
@@ -693,7 +696,14 @@ def test_build_dashboard_cards_top_org_cards_use_ag_grid():
         tables = _find_components(card, dash_table.DataTable)
 
         assert grids, f"aucune AgGrid dans la card {card_id}"
-        assert grids[0].rowData, f"AgGrid sans lignes dans la card {card_id}"
+        assert grids[0].rowModelType == "infinite"
+        assert grids[0].rowData is None
+        assert grids[0].id == {
+            "type": "top-org-grid",
+            "context": "observatoire",
+            "org_type": org_type,
+            "scope": "abc123",
+        }
         assert not tables, f"DataTable encore présent dans la card {card_id}"
 
 

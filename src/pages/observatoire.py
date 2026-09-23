@@ -5,6 +5,7 @@ import dash_bootstrap_components as dbc
 import polars as pl
 from dash import (
     ALL,
+    MATCH,
     Input,
     Output,
     State,
@@ -47,6 +48,8 @@ from src.utils.table import (
     selection_from_hidden_columns,
     write_styled_excel,
 )
+from src.utils.table_sql import dashboard_filters_to_sql
+from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
 from src.utils.tracking import track_download
 
 NAME = "Observatoire"
@@ -675,7 +678,12 @@ def _compute_dashboard_children(filter_params_normalized: tuple, theme: str):
     }
 
     dff = prepare_dashboard_data(columns=observatoire_cards_columns(), **filter_params)
-    return build_dashboard_cards(dff, theme=theme)
+    return build_dashboard_cards(
+        dff,
+        theme=theme,
+        context="observatoire",
+        scope=scope_key(filter_params_normalized),
+    )
 
 
 @callback(
@@ -704,6 +712,46 @@ def update_dashboard_cards(card_order, *filter_values):
         children = [cards_drag_marker("observatoire-card-order-nouveau"), *children]
 
     return dbc.Row(children=children), filter_params
+
+
+@callback(
+    Output(
+        {
+            "type": GRID_TYPE,
+            "context": "observatoire",
+            "org_type": MATCH,
+            "scope": MATCH,
+        },
+        "getRowsResponse",
+    ),
+    Input(
+        {
+            "type": GRID_TYPE,
+            "context": "observatoire",
+            "org_type": MATCH,
+            "scope": MATCH,
+        },
+        "getRowsRequest",
+    ),
+    *[State(fp[0], "value") for fp in FILTER_PARAMS],
+    prevent_initial_call=True,
+)
+def get_top_org_rows(request, *filter_values):
+    """Lignes d'une grille top, sur le périmètre courant de l'observatoire.
+
+    Les filtres sont relus à la source (leurs composants) plutôt que dans le
+    store `observatoire-filters`, écrit par le même callback que les cards.
+    """
+    if request is None or ctx.triggered_id is None:
+        return no_update
+    filter_params = {
+        input_id: value
+        for (input_id, _url_key, _is_multi, _default), value in zip(
+            FILTER_PARAMS, filter_values
+        )
+    }
+    where_sql, params = dashboard_filters_to_sql(**filter_params)
+    return fetch_top_org_page(ctx.triggered_id["org_type"], where_sql, params, request)
 
 
 @callback(

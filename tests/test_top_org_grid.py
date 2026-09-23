@@ -381,3 +381,29 @@ def test_column_defs_types_de_filtre():
     assert defs["Attributions"]["filter"] == "agNumberColumnFilter"
     assert defs["titulaire_distance"]["filter"] == "agNumberColumnFilter"
     assert all(d["sortable"] for d in defs.values())
+
+
+def test_callbacks_datasource_enregistres_pour_chaque_contexte():
+    """Un callback getRowsResponse par contexte, sinon deux pages écriraient
+    la même sortie (Dash refuse une sortie dupliquée).
+
+    Les clés de GLOBAL_CALLBACK_MAP sont les ids sérialisés en JSON à clés
+    triées, par exemple :
+    {"context":"acheteur","org_type":["MATCH"],"scope":["MATCH"],"type":"top-org-grid"}
+    """
+    from dash._callback import GLOBAL_CALLBACK_MAP
+
+    import src.app  # noqa: F401  # instancie Dash → register_page()
+
+    cles = [
+        k.replace(" ", "")
+        for k in GLOBAL_CALLBACK_MAP
+        if "top-org-grid" in k and "getRowsResponse" in k
+    ]
+    contextes = {
+        contexte
+        for contexte in ("observatoire", "tableau", "acheteur", "titulaire")
+        if any(f'"context":"{contexte}"' in k for k in cles)
+    }
+
+    assert contextes == {"observatoire", "tableau", "acheteur", "titulaire"}

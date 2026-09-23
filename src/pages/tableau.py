@@ -6,6 +6,7 @@ from urllib.parse import parse_qs
 import dash_bootstrap_components as dbc
 from dash import (
     ALL,
+    MATCH,
     Input,
     Output,
     State,
@@ -53,6 +54,7 @@ from src.utils.table import (
     selection_from_hidden_columns,
     write_styled_excel,
 )
+from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
 from src.utils.tracking import track_download, track_search
 
 update_date_timestamp = get_data_update_timestamp(
@@ -1041,7 +1043,12 @@ def _cards_pour_filtre(filter_model_json: str, theme: str):
     dff = query_marches(
         where_sql=where_sql, params=params, columns=observatoire_cards_columns()
     )
-    return build_dashboard_cards(dff, theme=theme)
+    return build_dashboard_cards(
+        dff,
+        theme=theme,
+        context="tableau",
+        scope=scope_key(filter_model_json),
+    )
 
 
 @callback(
@@ -1086,6 +1093,28 @@ def update_mode_observatoire_cards(mode_actif, filter_model, card_order):
     return [cards_drag_marker("tableau-card-order-nouveau"), *cards], (
         MODE_OBSERVATOIRE_CLASSES
     )
+
+
+@callback(
+    Output(
+        {"type": GRID_TYPE, "context": "tableau", "org_type": MATCH, "scope": MATCH},
+        "getRowsResponse",
+    ),
+    Input(
+        {"type": GRID_TYPE, "context": "tableau", "org_type": MATCH, "scope": MATCH},
+        "getRowsRequest",
+    ),
+    State("tableau_grid", "filterModel"),
+    prevent_initial_call=True,
+)
+def get_top_org_rows_tableau(request, filter_model):
+    """Lignes d'une grille top, sur le filtre courant de la grille de marchés."""
+    if request is None or ctx.triggered_id is None:
+        return no_update
+    where_sql, params = ast_to_sql(
+        filtermodel_to_ast(filter_model or {}, schema), schema
+    )
+    return fetch_top_org_page(ctx.triggered_id["org_type"], where_sql, params, request)
 
 
 @callback(
