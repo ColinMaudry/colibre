@@ -391,13 +391,22 @@ def test_callbacks_datasource_enregistres_pour_chaque_contexte():
     triées, par exemple :
     {"context":"acheteur","org_type":["MATCH"],"scope":["MATCH"],"type":"top-org-grid"}
     """
-    from dash._callback import GLOBAL_CALLBACK_MAP
+    import dash
 
-    import src.app  # noqa: F401  # instancie Dash → register_page()
+    from src.app import app  # instancie Dash → register_page()
+
+    # Tant que l'app n'a pas été servie, les callbacks enregistrés via le
+    # décorateur global `dash.callback` vivent dans
+    # dash._callback.GLOBAL_CALLBACK_MAP ; ils ne migrent vers
+    # app.callback_map qu'à la première requête (_setup_server). On inspecte
+    # donc les deux registres pour ne pas dépendre de l'ordre des tests (voir
+    # tests/test_entity_grid.py et tests/test_csrf_architecture.py pour le
+    # même motif).
+    callback_keys = set(dash._callback.GLOBAL_CALLBACK_MAP) | set(app.callback_map)
 
     cles = [
         k.replace(" ", "")
-        for k in GLOBAL_CALLBACK_MAP
+        for k in callback_keys
         if "top-org-grid" in k and "getRowsResponse" in k
     ]
     contextes = {
