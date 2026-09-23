@@ -327,19 +327,25 @@ def aggregate_marches(
     where_sql: str = "TRUE",
     params: tuple | list = (),
     group_by: str | None = None,
+    having: str | None = None,
     order_by: str | None = None,
     limit: int | None = None,
     offset: int | None = None,
 ) -> pl.DataFrame:
     """SELECT agrégé paramétré contre la table decp.
 
-    `select_sql`, `group_by` et `order_by` sont des fragments SQL construits
-    depuis des noms de colonnes validés (jamais de valeur utilisateur libre).
-    Les valeurs de filtre passent par le binding `?` via `params`.
+    `select_sql`, `group_by`, `having` et `order_by` sont des fragments SQL
+    construits depuis des noms de colonnes validés (jamais de valeur
+    utilisateur libre). Les valeurs de filtre passent par le binding `?` via
+    `params`. `having` est un fragment SQL construit depuis des noms de
+    colonnes validés ; ses valeurs sont liées via `params`, à la suite de
+    celles du `WHERE`.
     """
     sql = f"SELECT {select_sql} FROM decp WHERE {where_sql}"
     if group_by:
         sql += f" GROUP BY {group_by}"
+    if having:
+        sql += f" HAVING {having}"
     if order_by:
         sql += f" ORDER BY {order_by}"
     if limit is not None:
@@ -350,3 +356,28 @@ def aggregate_marches(
     logger.debug("aggregate_marches: " + sql.replace("?", "{}").format(*params))
 
     return get_cursor().execute(sql, list(params)).pl()
+
+
+def count_aggregate(
+    select_sql: str,
+    where_sql: str = "TRUE",
+    params: tuple | list = (),
+    group_by: str | None = None,
+    having: str | None = None,
+) -> int:
+    """Nombre de lignes renvoyées par un SELECT agrégé (COUNT des groupes).
+
+    Pendant de `count_marches` pour les grilles paginées sur un agrégat : la
+    grille a besoin du nombre total de groupes pour dimensionner sa
+    pagination, sans rapatrier les groupes eux-mêmes.
+    """
+    inner = f"SELECT {select_sql} FROM decp WHERE {where_sql}"
+    if group_by:
+        inner += f" GROUP BY {group_by}"
+    if having:
+        inner += f" HAVING {having}"
+
+    result = (
+        get_cursor().execute(f"SELECT COUNT(*) FROM ({inner})", list(params)).fetchone()
+    )
+    return int(result[0]) if result else 0
