@@ -10,12 +10,18 @@ callbacks de datasource vivent dans les pages, qui savent reconstruire leur
 périmètre SQL (cf. src/utils/entity_grid.py, même découpage).
 """
 
+import hashlib
+import json
+
+import dash_ag_grid as dag
 import polars as pl
 from dash import no_update
 
 from src.db import aggregate_marches, count_aggregate, schema
+from src.figures import AG_GRID_LOCALE_FR, AG_GRID_THEME
 from src.utils import logger
 from src.utils.cache import cache
+from src.utils.data import DATA_SCHEMA
 from src.utils.query_ast import ast_to_sql, filtermodel_to_ast
 from src.utils.table import add_links
 
@@ -230,3 +236,78 @@ def fetch_top_org_page(org_type, where_sql, params, request, extra_columns=()):
         offset=start,
     )
     return {"rowData": _rows_with_links(dff), "rowCount": total}
+
+
+GRID_TYPE = "top-org-grid"
+PAGE_SIZE = 10
+_ROW_HEIGHT = 42
+#: Hauteur totale : en-tête (49) + filtre flottant (40) + 10 lignes + barre de
+#: pagination (48). `domLayout: "autoHeight"` n'existe pas en modèle infinite.
+GRID_HEIGHT = f"{49 + 40 + PAGE_SIZE * _ROW_HEIGHT + 48}px"
+
+
+def scope_key(*parts) -> str:
+    """Clé courte et stable identifiant un périmètre.
+
+    Elle n'entre JAMAIS dans une requête : elle sert uniquement à faire varier
+    l'id de la grille, donc à forcer React à la remonter quand le périmètre
+    change. Sans remontage, AG Grid garderait son bloc en cache et
+    n'appellerait pas le datasource.
+    """
+    raw = json.dumps(parts, sort_keys=True, default=str)
+    return hashlib.blake2s(raw.encode(), digest_size=8).hexdigest()
+
+
+def top_org_grid_id(context: str, org_type: str, scope: str) -> dict:
+    return {"type": GRID_TYPE, "context": context, "org_type": org_type, "scope": scope}
+
+
+def top_org_column_defs(org_type: str, extra_columns=()) -> list[dict]:
+    """columnDefs statiques : elles ne dépendent plus des données."""
+    numeric = {AGG_COLUMN, *extra_columns}
+    defs = []
+    for column in [*group_columns(org_type, extra_columns), AGG_COLUMN]:
+        if column.endswith("_id") or column == "titulaire_typeIdentifiant":
+            continue
+        col_def = {
+            "field": column,
+            "headerName": DATA_SCHEMA.get(column, {}).get("title", column),
+            "sortable": True,
+            "filter": "agNumberColumnFilter"
+            if column in numeric
+            else "agTextColumnFilter",
+        }
+        if column == f"{org_type}_nom":
+            col_def |= {"cellRenderer": "markdown", "flex": 1}
+        defs.append(col_def)
+    return defs
+
+
+def top_org_grid(context: str, org_type: str, scope: str, extra_columns=()):
+    """Grille top paginée côté serveur, alimentée par le callback du contexte."""
+    return dag.AgGrid(
+        id=top_org_grid_id(context, org_type, scope),
+        columnDefs=top_org_column_defs(org_type, extra_columns),
+        rowData=None,  # aucune donnée embarquée : le datasource alimente la grille
+        rowModelType="infinite",
+        dangerously_allow_code=True,  # rend le HTML <a> des cellules liens
+        dashGridOptions={
+            "pagination": True,
+            "paginationPageSize": PAGE_SIZE,
+            "cacheBlockSize": PAGE_SIZE,
+            "maxBlocksInCache": 10,
+            "rowBuffer": 0,
+            "infiniteInitialRowCount": PAGE_SIZE,
+            "rowHeight": _ROW_HEIGHT,
+            "suppressCellFocus": True,
+            "localeText": {
+                **AG_GRID_LOCALE_FR,
+                "noRowsToShow": "Aucune organisation",
+            },
+            "theme": AG_GRID_THEME,
+        },
+        defaultColDef={"resizable": True, "floatingFilter": True},
+        style={"height": GRID_HEIGHT, "width": "100%"},
+        persistence=False,
+        columnSize="responsiveSizeToFit",
+    )

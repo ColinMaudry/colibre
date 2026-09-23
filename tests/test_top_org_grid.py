@@ -320,3 +320,64 @@ def test_tri_sur_colonne_inconnue_ignore():
         [{"colId": "objet; DROP TABLE decp", "sort": "asc"}], "titulaire"
     )
     assert sql == '"Attributions" DESC, "titulaire_id" ASC'
+
+
+def test_grid_id_pattern_matching():
+    import dash_ag_grid as dag
+
+    from src.utils.top_org_grid import top_org_grid
+
+    grille = top_org_grid("observatoire", "titulaire", "abc123")
+
+    assert isinstance(grille, dag.AgGrid)
+    assert grille.id == {
+        "type": "top-org-grid",
+        "context": "observatoire",
+        "org_type": "titulaire",
+        "scope": "abc123",
+    }
+
+
+def test_grid_est_en_modele_infinite_pagine():
+    from src.utils.top_org_grid import PAGE_SIZE, top_org_grid
+
+    grille = top_org_grid("observatoire", "acheteur", "abc123")
+    options = grille.dashGridOptions
+
+    assert grille.rowModelType == "infinite"
+    assert options["pagination"] is True
+    assert options["paginationPageSize"] == PAGE_SIZE
+    assert options["cacheBlockSize"] == PAGE_SIZE
+    # domLayout: "autoHeight" est incompatible avec le modèle infinite : ne
+    # doit pas être posé du tout, la hauteur doit être fixe.
+    assert "domLayout" not in options
+    assert grille.style["height"].endswith("px")
+    assert grille.rowData is None  # aucune donnée embarquée
+    assert grille.persistence in (False, None)
+
+
+def test_grid_scopes_distincts_donnent_des_ids_distincts():
+    from src.utils.top_org_grid import scope_key, top_org_grid_id
+
+    id1 = top_org_grid_id("acheteur", "titulaire", scope_key("/acheteurs/1", "2025"))
+    id2 = top_org_grid_id("acheteur", "titulaire", scope_key("/acheteurs/2", "2025"))
+    id3 = top_org_grid_id("tableau", "titulaire", scope_key("/acheteurs/1", "2025"))
+
+    assert id1 != id2  # sinon React ne remonte pas la grille au changement de fiche
+    assert id1 != id3  # un callback par contexte
+
+
+def test_column_defs_types_de_filtre():
+    from src.utils.top_org_grid import top_org_column_defs
+
+    defs = {
+        d["field"]: d for d in top_org_column_defs("titulaire", ["titulaire_distance"])
+    }
+
+    assert "titulaire_id" not in defs  # lien porté par le nom
+    assert "titulaire_typeIdentifiant" not in defs  # technique, requis par add_links
+    assert defs["titulaire_nom"]["filter"] == "agTextColumnFilter"
+    assert defs["titulaire_nom"]["cellRenderer"] == "markdown"
+    assert defs["Attributions"]["filter"] == "agNumberColumnFilter"
+    assert defs["titulaire_distance"]["filter"] == "agNumberColumnFilter"
+    assert all(d["sortable"] for d in defs.values())
