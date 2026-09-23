@@ -34,6 +34,7 @@ from src.utils.table import (
     write_styled_excel,
 )
 from src.utils.top_org_grid import (
+    CARD_MIN_HEIGHT,
     GRID_TYPE,
     fetch_top_org_page,
     scope_key,
@@ -194,7 +195,11 @@ def layout(acheteur_id=None, **kwargs):
                                     className="marches_table",
                                     id="top10_titulaires",
                                     width=8,
-                                    style={"minHeight": "420px"},
+                                    # La grille top est en modèle infinite : sa
+                                    # hauteur est fixe et connue d'avance. On la
+                                    # réserve pour que son arrivée par callback
+                                    # ne décale pas la suite de la page (#142).
+                                    style={"minHeight": CARD_MIN_HEIGHT},
                                 ),
                                 dbc.Col(
                                     id="acheteur-distance-histogram",

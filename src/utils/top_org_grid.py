@@ -242,8 +242,28 @@ GRID_TYPE = "top-org-grid"
 PAGE_SIZE = 10
 _ROW_HEIGHT = 42
 #: Hauteur totale : en-tête (49) + filtre flottant (40) + 10 lignes + barre de
-#: pagination (48). `domLayout: "autoHeight"` n'existe pas en modèle infinite.
-GRID_HEIGHT = f"{49 + 40 + PAGE_SIZE * _ROW_HEIGHT + 48}px"
+#: pagination (48). `domLayout: "autoHeight"` n'existe pas en modèle infinite,
+#: donc cette hauteur est SUBIE : la grille l'occupe dès son montage, sans
+#: jamais s'adapter au nombre de lignes.
+GRID_HEIGHT_PX = 49 + 40 + PAGE_SIZE * _ROW_HEIGHT + 48
+GRID_HEIGHT = f"{GRID_HEIGHT_PX}px"
+
+#: Habillage d'une card `make_card` autour de la grille : titre h5 + paddings
+#: de `.card-body`, mesurés à 66 px, arrondis pour absorber une variation de
+#: police ou de thème.
+CARD_CHROME_PX = 70
+
+#: Hauteur à réserver par le conteneur qui accueillera la grille, selon qu'elle
+#: y est posée nue ou dans une card.
+#:
+#: Ces deux constantes ne sont pas cosmétiques : les tops arrivent par callback,
+#: donc APRÈS le premier rendu de la page. Si le conteneur réserve moins que la
+#: hauteur réelle de la grille, l'arrivée de celle-ci pousse vers le bas tout ce
+#: qui la suit (boutons « Colonnes », « Réinitialiser », grille des marchés…) —
+#: un saut de mise en page qui fait rater le clic en cours. Toute réservation
+#: doit donc se dériver d'ici, jamais être recopiée en dur.
+HOST_MIN_HEIGHT = GRID_HEIGHT
+CARD_MIN_HEIGHT = f"{GRID_HEIGHT_PX + CARD_CHROME_PX}px"
 
 
 def scope_key(*parts) -> str:

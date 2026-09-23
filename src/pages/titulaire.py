@@ -34,6 +34,7 @@ from src.utils.table import (
 )
 from src.utils.top_org_grid import (
     GRID_TYPE,
+    HOST_MIN_HEIGHT,
     fetch_top_org_page,
     scope_key,
     top_org_grid,
@@ -205,7 +206,12 @@ def layout(titulaire_id=None, **kwargs):
                                             html.Div(
                                                 className="marches_table",
                                                 id="top10_acheteurs",
-                                                style={"minHeight": "420px"},
+                                                # Grille posée nue (sans card) :
+                                                # on réserve exactement sa
+                                                # hauteur, pour que son arrivée
+                                                # par callback ne décale pas la
+                                                # suite de la page (#142).
+                                                style={"minHeight": HOST_MIN_HEIGHT},
                                             ),
                                         ],
                                     ),
