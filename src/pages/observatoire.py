@@ -406,13 +406,6 @@ layout = [
                                                         style={"display": "none"},
                                                     ),
                                                 ],
-                                                lg=12,
-                                                xl=6,
-                                            ),
-                                            dbc.Col(
-                                                id="observatoire-copy-container",
-                                                lg=12,
-                                                xl=6,
                                             ),
                                         ]
                                     ),
