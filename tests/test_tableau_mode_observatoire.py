@@ -12,7 +12,7 @@ def layout_str():
     from src.app import app  # noqa: F401  (instancie Dash avant les pages)
     from src.pages import tableau
 
-    return str(tableau.layout)
+    return str(tableau._layout(False))
 
 
 def test_la_barre_doutils_porte_linterrupteur(layout_str):
@@ -177,3 +177,27 @@ def test_le_mode_demploi_documente_linterrupteur(layout_str):
     """La légende du mode d'emploi reproduit chaque bouton de la barre d'outils
     en face de sa fonction : un contrôle de plus doit y figurer aussi."""
     assert "mode-observatoire-legende" in layout_str
+
+
+def test_un_non_abonne_a_linterrupteur_desactive_et_linfobulle():
+    from src.app import app  # noqa: F401
+    from src.pages import tableau
+
+    markup = str(tableau._layout(False))
+
+    assert "tableau-mode-observatoire',value=False,disabled=True" in markup.replace(
+        " ", ""
+    )
+    assert "Fonctionnalité accessible en vous abonnant" in markup
+
+
+def test_un_abonne_a_linterrupteur_actif_sans_infobulle():
+    from src.app import app  # noqa: F401
+    from src.pages import tableau
+
+    markup = str(tableau._layout(True))
+
+    assert "tableau-mode-observatoire',value=False,disabled=False" in markup.replace(
+        " ", ""
+    )
+    assert "Fonctionnalité accessible en vous abonnant" not in markup

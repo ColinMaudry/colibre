@@ -185,420 +185,434 @@ def _help_button_legend():
     )
 
 
-layout = [
-    dcc.Location(id="tableau_url", refresh=False),
-    dcc.Store(id="tableau-hidden-columns", storage_type="local"),
-    # Ordre des cards du mode observatoire (#107). Même table, même clé
-    # (user_id) que /observatoire : les deux pages partagent un seul ordre.
-    dcc.Store(id="tableau-card-order"),
-    # Ordre poussé par observatoire-dragdrop.js ; Store distinct du précédent
-    # pour que le callback de persistance ne soit pas son propre Input.
-    dcc.Store(id="tableau-card-order-nouveau"),
-    # Puits de sortie : la persistance écrit en base, pas dans le layout.
-    dcc.Store(id="tableau-card-order-persiste"),
-    dcc.Store(id="tableau-table"),
-    dcc.Store(id="tableau-total"),
-    dcc.Store(id="tableau-total-unique"),
-    dcc.Store(id="active-view"),
-    dcc.Store(id="vue-resolution"),
-    html.Script(
-        type="application/ld+json",
-        id="dataset_jsonld",
-        children=[
-            json.dumps(
-                {
-                    "@context": "https://schema.org/",
-                    "@type": "Dataset",
-                    "name": "Données essentielles des marchés publics français (DECP)",
-                    "description": "Données de marchés publics exhaustives décrivant les marchés publics attribués en France depuis 2018.",
-                    "url": "https://colibre.fr",
-                    "sameAs": "https://www.data.gouv.fr/datasets/608c055b35eb4e6ee20eb325",
-                    "keywords": [
-                        "marchés publics",
-                        "commande publique",
-                        "decp",
-                        "public procurement",
-                    ],
-                    "license": "https://www.etalab.gouv.fr/licence-ouverte-open-licence",
-                    "isAccessibleForFree": True,
-                    "creator": {
-                        "@type": "Organization",
-                        "url": "https://colmo.tech",
-                        "name": "Colmo",
-                        "sameAs": "https://annuaire-entreprises.data.gouv.fr/entreprise/colmo-989393350",
-                        "contactPoint": {
-                            "@type": "ContactPoint",
-                            "contactType": "Support et contact commercial",
-                            "email": "colin@colmo.tech",
+def _layout(a_un_abonnement: bool) -> list:
+    return [
+        dcc.Location(id="tableau_url", refresh=False),
+        dcc.Store(id="tableau-hidden-columns", storage_type="local"),
+        # Choix du mode d'affichage (lignes ⇄ observatoire) persisté entre visites.
+        dcc.Store(id="tableau-mode-observatoire-persiste", storage_type="local"),
+        # Ordre des cards du mode observatoire (#107). Même table, même clé
+        # (user_id) que /observatoire : les deux pages partagent un seul ordre.
+        dcc.Store(id="tableau-card-order"),
+        # Ordre poussé par observatoire-dragdrop.js ; Store distinct du précédent
+        # pour que le callback de persistance ne soit pas son propre Input.
+        dcc.Store(id="tableau-card-order-nouveau"),
+        # Puits de sortie : la persistance écrit en base, pas dans le layout.
+        dcc.Store(id="tableau-card-order-persiste"),
+        dcc.Store(id="tableau-table"),
+        dcc.Store(id="tableau-total"),
+        dcc.Store(id="tableau-total-unique"),
+        dcc.Store(id="active-view"),
+        dcc.Store(id="vue-resolution"),
+        html.Script(
+            type="application/ld+json",
+            id="dataset_jsonld",
+            children=[
+                json.dumps(
+                    {
+                        "@context": "https://schema.org/",
+                        "@type": "Dataset",
+                        "name": "Données essentielles des marchés publics français (DECP)",
+                        "description": "Données de marchés publics exhaustives décrivant les marchés publics attribués en France depuis 2018.",
+                        "url": "https://colibre.fr",
+                        "sameAs": "https://www.data.gouv.fr/datasets/608c055b35eb4e6ee20eb325",
+                        "keywords": [
+                            "marchés publics",
+                            "commande publique",
+                            "decp",
+                            "public procurement",
+                        ],
+                        "license": "https://www.etalab.gouv.fr/licence-ouverte-open-licence",
+                        "isAccessibleForFree": True,
+                        "creator": {
+                            "@type": "Organization",
+                            "url": "https://colmo.tech",
+                            "name": "Colmo",
+                            "sameAs": "https://annuaire-entreprises.data.gouv.fr/entreprise/colmo-989393350",
+                            "contactPoint": {
+                                "@type": "ContactPoint",
+                                "contactType": "Support et contact commercial",
+                                "email": "colin@colmo.tech",
+                            },
+                        },
+                        "includedInDataCatalog": {
+                            "@type": "DataCatalog",
+                            "name": "data.gouv.fr",
+                        },
+                        "distribution": [
+                            {
+                                "@type": "DataDownload",
+                                "encodingFormat": "CSV",
+                                "contentUrl": "https://www.data.gouv.fr/api/1/datasets/r/22847056-61df-452d-837d-8b8ceadbfc52",
+                            },
+                            {
+                                "@type": "DataDownload",
+                                "encodingFormat": "Parquet",
+                                "contentUrl": "https://www.data.gouv.fr/api/1/datasets/r/11cea8e8-df3e-4ed1-932b-781e2635e432",
+                            },
+                        ],
+                        **(
+                            {"temporalCoverage": f"2018-01-01/{update_date_iso[:10]}"}
+                            if update_date_iso
+                            else {}
+                        ),
+                        "spatialCoverage": {
+                            "@type": "Place",
+                            "address": {"countryCode": "FR"},
                         },
                     },
-                    "includedInDataCatalog": {
-                        "@type": "DataCatalog",
-                        "name": "data.gouv.fr",
-                    },
-                    "distribution": [
-                        {
-                            "@type": "DataDownload",
-                            "encodingFormat": "CSV",
-                            "contentUrl": "https://www.data.gouv.fr/api/1/datasets/r/22847056-61df-452d-837d-8b8ceadbfc52",
-                        },
-                        {
-                            "@type": "DataDownload",
-                            "encodingFormat": "Parquet",
-                            "contentUrl": "https://www.data.gouv.fr/api/1/datasets/r/11cea8e8-df3e-4ed1-932b-781e2635e432",
-                        },
-                    ],
-                    **(
-                        {"temporalCoverage": f"2018-01-01/{update_date_iso[:10]}"}
-                        if update_date_iso
-                        else {}
-                    ),
-                    "spatialCoverage": {
-                        "@type": "Place",
-                        "address": {"countryCode": "FR"},
-                    },
-                },
-                indent=2,
-            )
-        ],
-    ),
-    dcc.Markdown(
-        f"Ce tableau contient tous les marchés attribués en France. Il vous permet d'appliquer un filtre sur une ou plusieurs colonnes, et ainsi produire la liste de marchés dont vous avez besoin. Par défaut seules quelques colonnes sont affichées, mais vous pouvez en afficher jusqu'à {len(schema.names())} en cliquant sur le bouton **Colonnes**. Cet outil est assez puissant, lisez le mode d'emploi pour en tirer pleinement partie.",
-        style={"maxWidth": "1000px"},
-    ),
-    html.Div(
-        [],
-        id="header",
-    ),
-    html.Div(id="vue-resolve-feedback"),
-    html.Div(
-        id="tableau-mode-wrapper",
-        className="tableau-mode",
-        children=[
-            dcc.Loading(
-                overlay_style={"visibility": "visible", "filter": "blur(2px)"},
-                id="loading-home",
-                type="default",
-                children=[
-                    html.Div(
-                        [
-                            # Modal du mode d'emploi
-                            dbc.Button(
-                                "⍰ Mode d'emploi",
-                                id="tableau_help_open",
-                                color="secondary",
-                                outline=True,
-                                size="sm",
-                            ),
-                            dbc.Modal(
-                                [
-                                    dbc.ModalHeader(dbc.ModalTitle("Mode d'emploi")),
-                                    dbc.ModalBody(
-                                        [
-                                            _help_button_legend(),
-                                            html.Hr(),
-                                            dcc.Markdown(
-                                                dangerously_allow_html=True,
-                                                children=f"""
-            ##### Définition des colonnes
-
-            Pour voir la définition d'une colonne et ses valeurs possibles, vous pouvez passer votre souris sur son en-tête ou bien consulter [la liste des champs](/projet/donnees#champs).
-
-            ##### Vos réglages sont persistents
-
-            Les filtres, les tris , le choix de colonnes, le placement et la largeur des colonnes sont automatiquement enregistrés dans votre navigateur et persistent même si vous changez de page ou si vous fermez votre navigateur. À votre retour, vous retrouverez cette page comme vous l'avez laissée.
-
-            ##### Filtrer les colonnes
-
-            Chaque colonne a son propre filtre : saisissez une valeur dans le champ situé juste sous son en-tête, ou cliquez sur l'icône entonnoir dans l'en-tête pour ouvrir le filtre complet.
-
-            - Champs textuels : contient (par défaut), égal à, ne contient pas, commence par, se termine par...
-            - Champs numériques (durée en mois, montant, nombre d'offres...) : égal à, supérieur à, inférieur à, entre (plage)...
-            - Champs date : égal à, avant, après, entre (plage)...
-
-            Dans le filtre complet (icône entonnoir), vous pouvez combiner deux conditions sur la même colonne avec **ET** ou **OU**.
-
-            Vous pouvez filtrer plusieurs colonnes à la fois ; les filtres de colonnes différentes se cumulent toujours (ET).
-
-            ##### Trier les données
-
-            Cliquez sur l'en-tête d'une colonne pour la trier. Chaque clic change le tri dans cet ordre :
-
-            1. tri croissant
-            2. tri décroissant
-            3. pas de tri
-
-            Pour trier sur plusieurs colonnes à la fois, maintenez la touche `Maj` (Shift) enfoncée en cliquant sur les en-têtes suivants : la première colonne triée a la priorité, la suivante ne départage qu'au sein des groupes de valeurs identiques de la précédente, et ainsi de suite.
-
-            ##### Défilement
-
-            Le tableau charge les lignes au fur et à mesure que vous faites défiler la page, plutôt que par pages numérotées. Les en-têtes de colonnes (et leurs filtres) restent toujours visibles en haut du tableau pendant le défilement.
-
-            ##### Afficher plus de colonnes
-
-            Par défaut, un nombre réduit de colonnes est affiché pour ne pas surcharger la page. Mais vous avez le choix parmi {len(schema.names())} colonnes, ce serait dommage de vous limiter !
-
-            Pour afficher plus de colonnes, cliquez sur le bouton **Colonnes** et cochez les colonnes à afficher.
-
-            ##### Vues sauvegardées (abonnés)
-
-            Une vue est un ensemble de filtres, de tris et de colonnes affichées que vous avez appliqués. Si vous êtes abonné, le bouton **Sauvegarder la vue** vous permet d'enregistrer la configuration actuelle sous un nom, et le menu **Mes vues** de la rappeler d'un clic plus tard.
-
-            ##### Télécharger le résultat
-
-            Vous pouvez télécharger le résultat de vos filtres et tris, pour les colonnes affichées, en cliquant sur **Télécharger (Excel)**.
-
-            ##### Liens
-
-            Les liens dans les colonnes Identifiant unique, Acheteur et Titulaire vous permettent de consulter une vue qui leur est dédiée
-            (informations, marchés attribués/remportés, etc.)
-
-            """,
-                                            ),
-                                        ],
-                                    ),
-                                    dbc.ModalFooter(
-                                        dbc.Button(
-                                            "Fermer",
-                                            id="tableau_help_close",
-                                            className="ms-auto",
-                                            n_clicks=0,
-                                        )
-                                    ),
-                                ],
-                                id="tableau_help",
-                                is_open=False,
-                                fullscreen="md-down",
-                                scrollable=True,
-                                size="lg",
-                            ),
-                            # Bouton modal des colonnes affichées
-                            dbc.Button(
-                                "Colonnes",
-                                id="tableau_columns_open",
-                                color="secondary",
-                                size="sm",
-                                className="column_list",
-                                title="Choisir les colonnes à afficher et masquer",
-                            ),
-                            html.Div(
-                                id="saved-views-bar",
-                                className="d-inline-flex align-items-center gap-2",
-                                children=[
-                                    # Boutons enveloppés dans un <span> : Bootstrap met
-                                    # `pointer-events: none` sur les boutons désactivés,
-                                    # ce qui empêche le survol (et donc le `title`
-                                    # natif) de fonctionner directement dessus. Le
-                                    # `title` est donc porté par le span englobant.
-                                    html.Span(
-                                        id="btn-save-view-wrapper",
-                                        className="d-inline-block",
-                                        children=dbc.Button(
-                                            "Sauvegarder la vue",
-                                            id="btn-save-view",
-                                            color="secondary",
-                                            size="sm",
-                                            # Grisé/désactivé pour les non-abonnés (le
-                                            # callback toggle_saved_views_controls
-                                            # affine au chargement).
-                                            disabled=True,
-                                        ),
-                                    ),
-                                    html.Span(
-                                        id="saved-views-menu-wrapper",
-                                        className="d-inline-block",
-                                        children=dbc.DropdownMenu(
-                                            id="saved-views-menu",
-                                            label="Mes vues",
-                                            color="secondary",
-                                            size="sm",
-                                            children=[],
-                                            disabled=True,
-                                            className="d-inline-block",
-                                        ),
-                                    ),
-                                ],
-                            ),
-                            dcc.Store(id="saved-views-refresh"),
-                            dbc.Modal(
-                                id="save-view-modal",
-                                is_open=False,
-                                children=[
-                                    dbc.ModalHeader(
-                                        dbc.ModalTitle("Sauvegarder la vue")
-                                    ),
-                                    dbc.ModalBody(
-                                        [
-                                            dbc.Label("Nom de la vue"),
-                                            dcc.Input(
-                                                id="save-view-name",
-                                                type="text",
-                                                className="form-control",
-                                            ),
-                                            html.Hr(className="my-3"),
-                                            dbc.Label("Ou remplacer une vue existante"),
-                                            dbc.Select(
-                                                id="overwrite-view-select",
-                                                options=[],
-                                                placeholder="Sélectionner une vue…",
-                                            ),
-                                            html.Div(
-                                                id="save-view-feedback",
-                                                className="mt-2",
-                                            ),
-                                        ]
-                                    ),
-                                    dbc.ModalFooter(
-                                        dbc.Button(
-                                            "Enregistrer",
-                                            id="btn-save-view-confirm",
-                                            color="secondary",
-                                        )
-                                    ),
-                                ],
-                            ),
-                            dbc.Button(
-                                "Télécharger au format Excel",
-                                id="btn-download-data",
-                                color="secondary",
-                                size="sm",
-                                disabled=True,
-                            ),
-                            dcc.Download(id="download-data"),
-                            dcc.Store(id="filtered_data", storage_type="memory"),
-                            dbc.Button(
-                                "Réinitialiser",
-                                id="btn-tableau-reset",
-                                color="danger",
-                                outline=True,
-                                size="sm",
-                                title="Supprime tous les filtres et les tris. Autrement ils sont conservés même si vous fermez la page.",
-                            ),
-                            # Interrupteur lignes ⇄ cards. Comme pour « Sauvegarder la
-                            # vue », le title est porté par le <span> englobant :
-                            # Bootstrap met `pointer-events: none` sur les contrôles
-                            # désactivés, ce qui empêche le survol de les atteindre.
-                            html.Span(
-                                id="tableau-mode-observatoire-wrapper",
-                                className="mode-observatoire-toggle",
-                                title="Fonctionnalité accessible en vous abonnant",
-                                children=[
-                                    html.Span(
-                                        "☰",
-                                        id="tableau-mode-observatoire-icone-lignes",
-                                        className="mode-observatoire-icone active",
-                                        title="Afficher les lignes de données",
-                                    ),
-                                    dbc.Switch(
-                                        id="tableau-mode-observatoire",
-                                        value=False,
-                                        # Grisé/désactivé pour les non-abonnés ; le
-                                        # callback toggle_mode_observatoire_control
-                                        # affine au chargement.
-                                        disabled=True,
-                                        className="mb-0",
-                                    ),
-                                    html.Span(
-                                        "📊",
-                                        id="tableau-mode-observatoire-icone-cards",
-                                        className="mode-observatoire-icone",
-                                        title="Afficher les visualisations de l'observatoire",
-                                    ),
-                                ],
-                            ),
-                        ],
-                        className="table-toolbar",
-                    ),
-                    html.Div(
-                        id="share-url-box",
-                        className="share-url-box d-none",
-                        children=[
-                            dbc.Label(
-                                "Lien direct vers cette vue :",
-                                className="mb-0",
-                                style={"fontSize": "0.9em"},
-                            ),
-                            # URL affichée comme texte sélectionnable : prend exactement
-                            # sa largeur (pas de champ pleine largeur qui encombre) et
-                            # passe à la ligne si le lien est long (pas de troncature).
-                            html.Span(
-                                id="share-url-text",
-                                className="share-url-text",
-                                style={"wordBreak": "break-all", "minWidth": 0},
-                            ),
-                            dcc.Clipboard(
-                                target_id="share-url-text",
-                                title="Copier le lien vers cette vue",
-                                className="btn btn-outline-secondary btn-sm "
-                                "d-inline-flex align-items-center",
-                                children=[
-                                    html.Img(
-                                        src="/assets/copy.svg",
-                                        alt="",
-                                        style={
-                                            "height": "1em",
-                                            "verticalAlign": "-0.15em",
-                                            "marginRight": "0.35em",
-                                        },
-                                    ),
-                                    "Copier le lien",
-                                ],
-                                copied_children="✓ Copié",
-                            ),
-                        ],
-                    ),
-                    html.Div(
-                        className="table-meta",
-                        children=[
-                            html.Span(id="nb_rows"),
-                            html.Span(" · Données mises à jour le " + str(update_date)),
-                        ],
-                    ),
-                    dbc.Modal(
-                        [
-                            dbc.ModalHeader(
-                                dbc.ModalTitle("Choix des colonnes à afficher")
-                            ),
-                            dbc.ModalBody(
-                                id="tableau_columns_body",
-                                children=make_column_picker("tableau"),
-                            ),
-                            dbc.ModalFooter(
+                    indent=2,
+                )
+            ],
+        ),
+        dcc.Markdown(
+            f"Ce tableau contient tous les marchés attribués en France. Il vous permet d'appliquer un filtre sur une ou plusieurs colonnes, et ainsi produire la liste de marchés dont vous avez besoin. Par défaut seules quelques colonnes sont affichées, mais vous pouvez en afficher jusqu'à {len(schema.names())} en cliquant sur le bouton **Colonnes**. Cet outil est assez puissant, lisez le mode d'emploi pour en tirer pleinement partie.",
+            style={"maxWidth": "1000px"},
+        ),
+        html.Div(
+            [],
+            id="header",
+        ),
+        html.Div(id="vue-resolve-feedback"),
+        html.Div(
+            id="tableau-mode-wrapper",
+            className="tableau-mode",
+            children=[
+                dcc.Loading(
+                    overlay_style={"visibility": "visible", "filter": "blur(2px)"},
+                    id="loading-home",
+                    type="default",
+                    children=[
+                        html.Div(
+                            [
+                                # Modal du mode d'emploi
                                 dbc.Button(
-                                    "Fermer",
-                                    id="tableau_columns_close",
-                                    className="ms-auto",
-                                    n_clicks=0,
-                                )
-                            ),
-                        ],
-                        id="tableau_columns",
-                        is_open=False,
-                        fullscreen="md-down",
-                        scrollable=True,
-                        size="xl",
-                    ),
-                    DATATABLE,
-                ],
-            ),
-            # Le bloc des cards vit HORS de `loading-home` : ce dcc.Loading enveloppe la
-            # barre d'outils et la grille, et tourne dès qu'un de ses descendants se met
-            # à jour — imbriquer celui des cards dedans affichait deux spinners empilés
-            # pour un seul callback. La modale « Montants » sort pour la même raison :
-            # son `is_open` est piloté par un callback (dans src/pages/observatoire.py).
-            dcc.Loading(
-                overlay_style={"visibility": "visible", "filter": "blur(2px)"},
-                type="default",
-                children=dbc.Row(
-                    id="tableau-observatoire-cards",
-                    className="mode-observatoire-cards d-none",
-                    children=[],
+                                    "⍰ Mode d'emploi",
+                                    id="tableau_help_open",
+                                    color="secondary",
+                                    outline=True,
+                                    size="sm",
+                                ),
+                                dbc.Modal(
+                                    [
+                                        dbc.ModalHeader(
+                                            dbc.ModalTitle("Mode d'emploi")
+                                        ),
+                                        dbc.ModalBody(
+                                            [
+                                                _help_button_legend(),
+                                                html.Hr(),
+                                                dcc.Markdown(
+                                                    dangerously_allow_html=True,
+                                                    children=f"""
+                ##### Définition des colonnes
+
+                Pour voir la définition d'une colonne et ses valeurs possibles, vous pouvez passer votre souris sur son en-tête ou bien consulter [la liste des champs](/projet/donnees#champs).
+
+                ##### Vos réglages sont persistents
+
+                Les filtres, les tris , le choix de colonnes, le placement et la largeur des colonnes sont automatiquement enregistrés dans votre navigateur et persistent même si vous changez de page ou si vous fermez votre navigateur. À votre retour, vous retrouverez cette page comme vous l'avez laissée.
+
+                ##### Filtrer les colonnes
+
+                Chaque colonne a son propre filtre : saisissez une valeur dans le champ situé juste sous son en-tête, ou cliquez sur l'icône entonnoir dans l'en-tête pour ouvrir le filtre complet.
+
+                - Champs textuels : contient (par défaut), égal à, ne contient pas, commence par, se termine par...
+                - Champs numériques (durée en mois, montant, nombre d'offres...) : égal à, supérieur à, inférieur à, entre (plage)...
+                - Champs date : égal à, avant, après, entre (plage)...
+
+                Dans le filtre complet (icône entonnoir), vous pouvez combiner deux conditions sur la même colonne avec **ET** ou **OU**.
+
+                Vous pouvez filtrer plusieurs colonnes à la fois ; les filtres de colonnes différentes se cumulent toujours (ET).
+
+                ##### Trier les données
+
+                Cliquez sur l'en-tête d'une colonne pour la trier. Chaque clic change le tri dans cet ordre :
+
+                1. tri croissant
+                2. tri décroissant
+                3. pas de tri
+
+                Pour trier sur plusieurs colonnes à la fois, maintenez la touche `Maj` (Shift) enfoncée en cliquant sur les en-têtes suivants : la première colonne triée a la priorité, la suivante ne départage qu'au sein des groupes de valeurs identiques de la précédente, et ainsi de suite.
+
+                ##### Défilement
+
+                Le tableau charge les lignes au fur et à mesure que vous faites défiler la page, plutôt que par pages numérotées. Les en-têtes de colonnes (et leurs filtres) restent toujours visibles en haut du tableau pendant le défilement.
+
+                ##### Afficher plus de colonnes
+
+                Par défaut, un nombre réduit de colonnes est affiché pour ne pas surcharger la page. Mais vous avez le choix parmi {len(schema.names())} colonnes, ce serait dommage de vous limiter !
+
+                Pour afficher plus de colonnes, cliquez sur le bouton **Colonnes** et cochez les colonnes à afficher.
+
+                ##### Vues sauvegardées (abonnés)
+
+                Une vue est un ensemble de filtres, de tris et de colonnes affichées que vous avez appliqués. Si vous êtes abonné, le bouton **Sauvegarder la vue** vous permet d'enregistrer la configuration actuelle sous un nom, et le menu **Mes vues** de la rappeler d'un clic plus tard.
+
+                ##### Télécharger le résultat
+
+                Vous pouvez télécharger le résultat de vos filtres et tris, pour les colonnes affichées, en cliquant sur **Télécharger (Excel)**.
+
+                ##### Liens
+
+                Les liens dans les colonnes Identifiant unique, Acheteur et Titulaire vous permettent de consulter une vue qui leur est dédiée
+                (informations, marchés attribués/remportés, etc.)
+
+                """,
+                                                ),
+                                            ],
+                                        ),
+                                        dbc.ModalFooter(
+                                            dbc.Button(
+                                                "Fermer",
+                                                id="tableau_help_close",
+                                                className="ms-auto",
+                                                n_clicks=0,
+                                            )
+                                        ),
+                                    ],
+                                    id="tableau_help",
+                                    is_open=False,
+                                    fullscreen="md-down",
+                                    scrollable=True,
+                                    size="lg",
+                                ),
+                                # Bouton modal des colonnes affichées
+                                dbc.Button(
+                                    "Colonnes",
+                                    id="tableau_columns_open",
+                                    color="secondary",
+                                    size="sm",
+                                    className="column_list",
+                                    title="Choisir les colonnes à afficher et masquer",
+                                ),
+                                html.Div(
+                                    id="saved-views-bar",
+                                    className="d-inline-flex align-items-center gap-2",
+                                    children=[
+                                        # Boutons enveloppés dans un <span> : Bootstrap met
+                                        # `pointer-events: none` sur les boutons désactivés,
+                                        # ce qui empêche le survol (et donc le `title`
+                                        # natif) de fonctionner directement dessus. Le
+                                        # `title` est donc porté par le span englobant.
+                                        html.Span(
+                                            id="btn-save-view-wrapper",
+                                            className="d-inline-block",
+                                            children=dbc.Button(
+                                                "Sauvegarder la vue",
+                                                id="btn-save-view",
+                                                color="secondary",
+                                                size="sm",
+                                                # Grisé/désactivé pour les non-abonnés (le
+                                                # callback toggle_saved_views_controls
+                                                # affine au chargement).
+                                                disabled=True,
+                                            ),
+                                        ),
+                                        html.Span(
+                                            id="saved-views-menu-wrapper",
+                                            className="d-inline-block",
+                                            children=dbc.DropdownMenu(
+                                                id="saved-views-menu",
+                                                label="Mes vues",
+                                                color="secondary",
+                                                size="sm",
+                                                children=[],
+                                                disabled=True,
+                                                className="d-inline-block",
+                                            ),
+                                        ),
+                                    ],
+                                ),
+                                dcc.Store(id="saved-views-refresh"),
+                                dbc.Modal(
+                                    id="save-view-modal",
+                                    is_open=False,
+                                    children=[
+                                        dbc.ModalHeader(
+                                            dbc.ModalTitle("Sauvegarder la vue")
+                                        ),
+                                        dbc.ModalBody(
+                                            [
+                                                dbc.Label("Nom de la vue"),
+                                                dcc.Input(
+                                                    id="save-view-name",
+                                                    type="text",
+                                                    className="form-control",
+                                                ),
+                                                html.Hr(className="my-3"),
+                                                dbc.Label(
+                                                    "Ou remplacer une vue existante"
+                                                ),
+                                                dbc.Select(
+                                                    id="overwrite-view-select",
+                                                    options=[],
+                                                    placeholder="Sélectionner une vue…",
+                                                ),
+                                                html.Div(
+                                                    id="save-view-feedback",
+                                                    className="mt-2",
+                                                ),
+                                            ]
+                                        ),
+                                        dbc.ModalFooter(
+                                            dbc.Button(
+                                                "Enregistrer",
+                                                id="btn-save-view-confirm",
+                                                color="secondary",
+                                            )
+                                        ),
+                                    ],
+                                ),
+                                dbc.Button(
+                                    "Télécharger au format Excel",
+                                    id="btn-download-data",
+                                    color="secondary",
+                                    size="sm",
+                                    disabled=True,
+                                ),
+                                dcc.Download(id="download-data"),
+                                dcc.Store(id="filtered_data", storage_type="memory"),
+                                dbc.Button(
+                                    "Réinitialiser",
+                                    id="btn-tableau-reset",
+                                    color="danger",
+                                    outline=True,
+                                    size="sm",
+                                    title="Supprime tous les filtres et les tris. Autrement ils sont conservés même si vous fermez la page.",
+                                ),
+                                # Interrupteur lignes ⇄ cards. Comme pour « Sauvegarder la
+                                # vue », le title est porté par le <span> englobant :
+                                # Bootstrap met `pointer-events: none` sur les contrôles
+                                # désactivés, ce qui empêche le survol de les atteindre.
+                                html.Span(
+                                    id="tableau-mode-observatoire-wrapper",
+                                    className="mode-observatoire-toggle",
+                                    title=(
+                                        ""
+                                        if a_un_abonnement
+                                        else "Fonctionnalité accessible en vous abonnant"
+                                    ),
+                                    children=[
+                                        html.Span(
+                                            "☰",
+                                            id="tableau-mode-observatoire-icone-lignes",
+                                            className="mode-observatoire-icone active",
+                                            title="Afficher les lignes de données",
+                                        ),
+                                        dbc.Switch(
+                                            id="tableau-mode-observatoire",
+                                            value=False,
+                                            disabled=not a_un_abonnement,
+                                            className="mb-0",
+                                        ),
+                                        html.Span(
+                                            "📊",
+                                            id="tableau-mode-observatoire-icone-cards",
+                                            className="mode-observatoire-icone",
+                                            title="Afficher les visualisations de l'observatoire",
+                                        ),
+                                    ],
+                                ),
+                            ],
+                            className="table-toolbar",
+                        ),
+                        html.Div(
+                            id="share-url-box",
+                            className="share-url-box d-none",
+                            children=[
+                                dbc.Label(
+                                    "Lien direct vers cette vue :",
+                                    className="mb-0",
+                                    style={"fontSize": "0.9em"},
+                                ),
+                                # URL affichée comme texte sélectionnable : prend exactement
+                                # sa largeur (pas de champ pleine largeur qui encombre) et
+                                # passe à la ligne si le lien est long (pas de troncature).
+                                html.Span(
+                                    id="share-url-text",
+                                    className="share-url-text",
+                                    style={"wordBreak": "break-all", "minWidth": 0},
+                                ),
+                                dcc.Clipboard(
+                                    target_id="share-url-text",
+                                    title="Copier le lien vers cette vue",
+                                    className="btn btn-outline-secondary btn-sm "
+                                    "d-inline-flex align-items-center",
+                                    children=[
+                                        html.Img(
+                                            src="/assets/copy.svg",
+                                            alt="",
+                                            style={
+                                                "height": "1em",
+                                                "verticalAlign": "-0.15em",
+                                                "marginRight": "0.35em",
+                                            },
+                                        ),
+                                        "Copier le lien",
+                                    ],
+                                    copied_children="✓ Copié",
+                                ),
+                            ],
+                        ),
+                        html.Div(
+                            className="table-meta",
+                            children=[
+                                html.Span(id="nb_rows"),
+                                html.Span(
+                                    " · Données mises à jour le " + str(update_date)
+                                ),
+                            ],
+                        ),
+                        dbc.Modal(
+                            [
+                                dbc.ModalHeader(
+                                    dbc.ModalTitle("Choix des colonnes à afficher")
+                                ),
+                                dbc.ModalBody(
+                                    id="tableau_columns_body",
+                                    children=make_column_picker("tableau"),
+                                ),
+                                dbc.ModalFooter(
+                                    dbc.Button(
+                                        "Fermer",
+                                        id="tableau_columns_close",
+                                        className="ms-auto",
+                                        n_clicks=0,
+                                    )
+                                ),
+                            ],
+                            id="tableau_columns",
+                            is_open=False,
+                            fullscreen="md-down",
+                            scrollable=True,
+                            size="xl",
+                        ),
+                        DATATABLE,
+                    ],
                 ),
-            ),
-            montant_modal(),
-        ],
-    ),
-]
+                # Le bloc des cards vit HORS de `loading-home` : ce dcc.Loading enveloppe la
+                # barre d'outils et la grille, et tourne dès qu'un de ses descendants se met
+                # à jour — imbriquer celui des cards dedans affichait deux spinners empilés
+                # pour un seul callback. La modale « Montants » sort pour la même raison :
+                # son `is_open` est piloté par un callback (dans src/pages/observatoire.py).
+                dcc.Loading(
+                    overlay_style={"visibility": "visible", "filter": "blur(2px)"},
+                    type="default",
+                    children=dbc.Row(
+                        id="tableau-observatoire-cards",
+                        className="mode-observatoire-cards d-none",
+                        children=[],
+                    ),
+                ),
+                montant_modal(),
+            ],
+        ),
+    ]
+
+
+def layout(**_):
+    return _layout(current_user_has_subscription())
 
 
 @callback(
@@ -1194,6 +1208,39 @@ def toggle_mode_observatoire_control(_pathname):
         not a_un_abonnement,
         "" if a_un_abonnement else "Fonctionnalité accessible en vous abonnant",
     )
+
+
+# Persistance du mode d'affichage, côté client pour éviter tout flash :
+# le dcc.Store(storage_type="local") est hydraté depuis localStorage avant
+# les callbacks initiaux, la restauration se fait donc dans le même cycle JS.
+# Un non-abonné (interrupteur désactivé dès le layout) ne restaure jamais le
+# mode observatoire, même s'il l'avait mémorisé avant.
+clientside_callback(
+    """
+    function(pathname, stored, desactive) {
+        if (desactive) {
+            return false;
+        }
+        return stored === true;
+    }
+    """,
+    Output("tableau-mode-observatoire", "value"),
+    Input("tableau_url", "pathname"),
+    State("tableau-mode-observatoire-persiste", "data"),
+    State("tableau-mode-observatoire", "disabled"),
+)
+
+
+clientside_callback(
+    """
+    function(value) {
+        return value;
+    }
+    """,
+    Output("tableau-mode-observatoire-persiste", "data"),
+    Input("tableau-mode-observatoire", "value"),
+    prevent_initial_call=True,
+)
 
 
 # Bascule de l'affichage côté client : la classe pose le masquage du corps de

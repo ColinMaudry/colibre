@@ -139,3 +139,61 @@ def test_un_compte_sans_acces_garde_linterrupteur_ferme(
     assert (
         enveloppe.get_attribute("title") == "Fonctionnalité accessible en vous abonnant"
     )
+
+
+CLE_LOCALSTORAGE = "_dash_persistence.tableau-mode-observatoire-persiste"
+
+
+def test_le_mode_observatoire_persiste_apres_rechargement(
+    dash_duo: DashComposite, compte_abonne
+):
+    """Un abonné qui bascule en mode visualisations, puis recharge la page,
+    retrouve le mode visualisations sans action de sa part."""
+    from src.app import app
+
+    dash_duo.start_server(app)
+    _se_connecter(dash_duo)
+    _ouvrir_le_tableau(dash_duo)
+    driver = dash_duo.driver
+
+    # Bascule en mode observatoire (sans filtre → message d'invitation, mais le
+    # mode est actif).
+    driver.find_element(By.ID, "tableau-mode-observatoire").click()
+    time.sleep(2)
+
+    # Le localStorage contient bien true.
+    valeur = driver.execute_script(
+        f"return window.localStorage.getItem('{CLE_LOCALSTORAGE}');"
+    )
+    assert valeur == "true"
+
+    # Rechargement : le mode doit être restauré côté client.
+    driver.get(f"{dash_duo.server_url}/tableau")
+    _ouvrir_le_tableau(dash_duo)
+
+    wrapper = driver.find_element(By.ID, "tableau-mode-wrapper")
+    assert "mode-observatoire" in wrapper.get_attribute("class")
+
+
+def test_un_ex_abonne_ne_restaurateur_pas_le_mode_observatoire(
+    dash_duo: DashComposite, compte_sans_abonnement
+):
+    """Un non-abonné dont le localStorage contient `true` (choix mémorisé avant
+    l'expiration de l'abonnement) ne doit pas se retrouver bloqué en mode
+    visualisations : l'interrupteur étant désactivé, la restauration renvoie
+    False et les lignes restent visibles."""
+    from src.app import app
+
+    dash_duo.start_server(app)
+    _se_connecter(dash_duo)
+    _ouvrir_le_tableau(dash_duo)
+    driver = dash_duo.driver
+
+    # Injecte le choix mémorisé comme si l'utilisateur l'avait fait en étant
+    # abonné, puis recharge.
+    driver.execute_script(f"window.localStorage.setItem('{CLE_LOCALSTORAGE}', 'true');")
+    driver.get(f"{dash_duo.server_url}/tableau")
+    _ouvrir_le_tableau(dash_duo)
+
+    wrapper = driver.find_element(By.ID, "tableau-mode-wrapper")
+    assert "mode-observatoire" not in wrapper.get_attribute("class")
