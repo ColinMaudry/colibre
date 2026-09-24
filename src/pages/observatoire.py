@@ -409,6 +409,7 @@ layout = [
                                             ),
                                         ]
                                     ),
+                                    dbc.Row(dbc.Col(id="observatoire-copy-container")),
                                 ],
                             ),
                             dbc.Col(

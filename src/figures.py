@@ -859,7 +859,7 @@ def get_distance_histogram(lff: pl.LazyFrame, theme: str | None = None) -> dcc.G
 def get_dashboard_summary_table(dff, dff_per_uid, nb_marches):
     nb_acheteurs = dff.select("acheteur_id").n_unique()
     nb_titulaires = dff.select("titulaire_id", "titulaire_typeIdentifiant").n_unique()
-    total_montant = int(dff_per_uid.select(pl.col("montant").sum()).item())
+    total_montant = int(dff_per_uid.select(pl.col("montant_rationalise").sum()).item())
     median_distance = dff.select(pl.median("titulaire_distance")).item()
 
     summary_table = [
@@ -1436,7 +1436,7 @@ def ag_grid(
 # vérifie tests/test_observatoire_cards_columns.py.
 OBSERVATOIRE_CARDS_COLUMNS = [
     "uid",
-    "montant",
+    "montant_rationalise",
     "dateNotification",
     "type",
     "sourceDataset",
@@ -1507,7 +1507,9 @@ def build_dashboard_cards(
     lff = dff.lazy()
 
     df_per_uid = (
-        dff.select("uid", "montant").group_by("uid").agg(pl.col("montant").first())
+        dff.select("uid", "montant_rationalise")
+        .group_by("uid")
+        .agg(pl.col("montant_rationalise").first())
     )
     nb_marches = df_per_uid.height
 
@@ -1669,9 +1671,9 @@ Les données ne sont quasiment pas modifiées afin de visibiliser le problème.
 
 Alors, comment fait-on ?
 
-\\* Les montants composés de plus de 11 chiffres, sans les décimales,
-[sont ramenés](https://github.com/ColinMaudry/decp-processing/blob/main/src/tasks/clean.py#L63-L71) à
-12 311 111 111, un nombre qui reste très élevé et qui est facilement reconnaissable.
+Sur colibre, les sommes de montant normalisent les montants extrêmes en les ramenant à la médiane des marchés similaires.
+
+[En savoir plus](https://github.com/ColinMaudry/decp-processing/blob/main/docs/explications_montants_anormaux.md) sur la détection des montants extrêmes et le calcul des montants rationalisé
 """
                     ),
                 ]

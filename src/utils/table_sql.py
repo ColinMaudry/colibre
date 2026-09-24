@@ -211,11 +211,11 @@ def dashboard_filters_to_sql(
         params.append(list(dashboard_marche_considerations_environnementales))
 
     if dashboard_montant_min is not None:
-        clauses.append('"montant" >= ?')
+        clauses.append('"montant_rationalise" >= ?')
         params.append(dashboard_montant_min)
 
     if dashboard_montant_max is not None:
-        clauses.append('"montant" <= ?')
+        clauses.append('"montant_rationalise" <= ?')
         params.append(dashboard_montant_max)
 
     return " AND ".join(clauses), params
