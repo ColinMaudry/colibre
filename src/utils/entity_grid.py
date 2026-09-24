@@ -281,5 +281,7 @@ def register_entity_grid_callbacks(org_type: str) -> None:
             f"{format_number(total_unique) or 0} marchés "
             f"({format_number(total) or 0} lignes)"
         )
-        disabled, children, title = get_button_properties(total)
+        # Le format (xlsx/csv) n'est pas utilisé ici : l'export filtré de
+        # cette grille reste hors du périmètre de la bascule CSV (#142).
+        disabled, children, title, _format = get_button_properties(total)
         return nb_rows, disabled, children, title

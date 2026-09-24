@@ -81,7 +81,8 @@ def test_le_compteur_et_le_bouton_pour_un_perimetre_non_vide():
     assert "marché" in nb_rows
     assert disabled is False
     assert texte == "Télécharger au format Excel"
-    assert titre
+    # Le bouton Excel n'a aucune infobulle (#142) : il se suffit à lui-même.
+    assert titre == ""
 
 
 @pytest.mark.parametrize(

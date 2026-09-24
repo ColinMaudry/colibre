@@ -123,3 +123,44 @@ def test_register_entity_grid_callbacks_registered_via_page_import():
     callback_keys = set(dash._callback.GLOBAL_CALLBACK_MAP) | set(app.callback_map)
     # Le store columnState partagé est piloté par un callback enregistré.
     assert any("entity-grid-columns-state.data" in k for k in callback_keys)
+
+
+def _get_meta_callback(org_type):
+    """Récupère la fonction _meta non décorée (closure de
+    register_entity_grid_callbacks), pour la tester directement sans passer
+    par le cycle de requête Dash."""
+    import dash
+
+    from src.app import app  # importe les pages → register_entity_grid_callbacks
+
+    registres = list(dash._callback.GLOBAL_CALLBACK_MAP.values()) + list(
+        app.callback_map.values()
+    )
+    for entree in registres:
+        fn = entree.get("callback")
+        if fn is None:
+            continue
+        wrapped = getattr(fn, "__wrapped__", None)
+        if wrapped is not None and wrapped.__name__ == "_meta":
+            # Chaque org_type a sa propre closure ; on la distingue par l'id
+            # du store total qu'elle consomme en entrée.
+            if any(
+                spec.get("id") == f"{org_type}-total"
+                for spec in entree.get("inputs") or []
+            ):
+                return wrapped
+    raise AssertionError(f"_meta introuvable pour {org_type}")
+
+
+def test_meta_ignore_le_format_et_ne_desactive_jamais_au_dela_de_zero():
+    """get_button_properties renvoie désormais 4 valeurs ; _meta (bouton
+    d'export filtré) doit absorber le format sans le répercuter, et ne plus
+    jamais désactiver le bouton au-delà de 0 ligne (#142)."""
+    meta_acheteur = _get_meta_callback("acheteur")
+
+    nb_rows, disabled, texte, titre = meta_acheteur(200_001, 5)
+
+    assert disabled is False
+    assert "lignes" in nb_rows
+    assert texte == "Télécharger au format CSV"
+    assert titre

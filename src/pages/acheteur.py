@@ -24,13 +24,14 @@ from src.figures import (
 )
 from src.utils.data import DF_ACHETEURS, get_annuaire_data, get_departement_region
 from src.utils.entity_grid import entity_scope, register_entity_grid_callbacks
-from src.utils.frontend import DROPDOWN_LABELS_FR, get_button_properties
+from src.utils.frontend import DROPDOWN_LABELS_FR, EXCEL_MAX_ROWS, get_button_properties
 from src.utils.seo import META_CONTENT, make_org_jsonld
 from src.utils.table import (
     format_number,
     get_default_hidden_columns,
     hidden_columns_from_selection,
     selection_from_hidden_columns,
+    write_csv,
     write_styled_excel,
 )
 from src.utils.top_org_grid import (
@@ -395,10 +396,9 @@ def update_acheteur_stats(pathname, ach_year):
 )
 def update_download_button_acheteur(pathname, ach_year):
     where_sql, params = _acheteur_scope(pathname, ach_year)
-    download_disabled, download_text, download_title = get_button_properties(
-        count_marches(where_sql, params)
+    download_disabled, download_text, download_title, _download_format = (
+        get_button_properties(count_marches(where_sql, params))
     )
-    download_title = "Télécharger les marchés publics de cet acheteur au format Excel"
     return download_disabled, download_text, download_title
 
 
@@ -459,17 +459,22 @@ def download_acheteur_data(
     df_to_download = query_marches(
         where_sql, params, order_by='"dateNotification" DESC, uid DESC'
     )
+    worksheet = "DECP" if annee in ["Toutes les années", None] else annee
 
-    def to_bytes(buffer):
-        write_styled_excel(
-            df_to_download,
-            buffer,
-            worksheet="DECP" if annee in ["Toutes les années", None] else annee,
-        )
+    if df_to_download.height > EXCEL_MAX_ROWS:
+        extension = "csv"
+
+        def to_bytes(buffer):
+            write_csv(df_to_download, buffer)
+    else:
+        extension = "xlsx"
+
+        def to_bytes(buffer):
+            write_styled_excel(df_to_download, buffer, worksheet=worksheet)
 
     date = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     track_download("/acheteurs/")
-    return dcc.send_bytes(to_bytes, filename=f"decp_{acheteur_nom}_{date}.xlsx")
+    return dcc.send_bytes(to_bytes, filename=f"decp_{acheteur_nom}_{date}.{extension}")
 
 
 @callback(

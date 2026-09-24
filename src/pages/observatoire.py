@@ -39,11 +39,12 @@ from src.utils.data import (
 )
 from src.utils.frontend import (
     DROPDOWN_LABELS_FR,
+    EXCEL_MAX_ROWS,
     get_button_properties,
     get_enum_values_as_dict,
 )
 from src.utils.seo import META_CONTENT
-from src.utils.table import format_number, write_styled_excel
+from src.utils.table import format_number, write_csv, write_styled_excel
 from src.utils.table_sql import dashboard_filters_to_sql
 from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
 from src.utils.tracking import track_download
@@ -691,12 +692,20 @@ def persist_card_order(card_order):
 def download_observatoire(_n_clicks, filter_params):
     dff = prepare_dashboard_data(**(filter_params or {}))
 
-    def to_bytes(buffer):
-        write_styled_excel(dff, buffer)
+    if dff.height > EXCEL_MAX_ROWS:
+        extension = "csv"
+
+        def to_bytes(buffer):
+            write_csv(dff, buffer)
+    else:
+        extension = "xlsx"
+
+        def to_bytes(buffer):
+            write_styled_excel(dff, buffer)
 
     date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     track_download("/observatoire")
-    return dcc.send_bytes(to_bytes, filename=f"decp_observatoire_{date}.xlsx")
+    return dcc.send_bytes(to_bytes, filename=f"decp_observatoire_{date}.{extension}")
 
 
 @callback(
@@ -759,6 +768,8 @@ def update_download_button_observatoire(filter_params):
     total_unique = count_unique_marches(where_sql, params)
 
     nb_rows = f"{format_number(height)} lignes ({format_number(total_unique)} marchés)"
-    download_disabled, download_text, download_title = get_button_properties(height)
+    download_disabled, download_text, download_title, _download_format = (
+        get_button_properties(height)
+    )
 
     return nb_rows, download_disabled, download_text, download_title

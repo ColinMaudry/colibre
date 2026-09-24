@@ -38,6 +38,7 @@ from src.saved_views import ui as saved_views_ui
 from src.theme import current_theme
 from src.utils import get_data_update_timestamp, logger
 from src.utils.cache import cache
+from src.utils.frontend import EXCEL_MAX_ROWS, get_button_properties
 from src.utils.grid import apply_persisted_layout, fetch_grid_page, grid_column_defs
 from src.utils.query_ast import (
     ast_from_dict,
@@ -52,6 +53,7 @@ from src.utils.table import (
     get_default_hidden_columns,
     hidden_columns_from_selection,
     selection_from_hidden_columns,
+    write_csv,
     write_styled_excel,
 )
 from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
@@ -448,7 +450,7 @@ layout = [
                                 ],
                             ),
                             dbc.Button(
-                                "Télécharger (Excel)",
+                                "Télécharger au format Excel",
                                 id="btn-download-data",
                                 color="secondary",
                                 size="sm",
@@ -542,7 +544,6 @@ layout = [
                         children=[
                             html.Span(id="nb_rows"),
                             html.Span(" · Données mises à jour le " + str(update_date)),
-                            html.Span(id="download-hint"),
                         ],
                     ),
                     dbc.Modal(
@@ -622,24 +623,22 @@ def get_rows_tableau(request):
 @callback(
     Output("nb_rows", "children"),
     Output("btn-download-data", "disabled"),
-    Output("download-hint", "children"),
+    Output("btn-download-data", "children"),
+    Output("btn-download-data", "title"),
     Input("tableau-total", "data"),
     Input("tableau-total-unique", "data"),
 )
 def update_meta(total, total_unique):
     total = total or 0
     total_unique = total_unique or 0
-    too_many = False  # total > 65000
-    hint = (
-        " · Filtrez sous 65 000 lignes pour activer le téléchargement"
-        if too_many
-        else ""
-    )
     nb_rows = (
         f"{format_number(total_unique) or 0} marchés "
         f"({format_number(total) or 0} lignes)"
     )
-    return nb_rows, too_many, hint
+    download_disabled, download_text, download_title, _download_format = (
+        get_button_properties(total)
+    )
+    return nb_rows, download_disabled, download_text, download_title
 
 
 @callback(
@@ -662,12 +661,20 @@ def download_data(n_clicks, filter_model, column_state):
         track_search(json.dumps(filter_model), "tab download")
     df = export_dataframe(filter_model, sort_model, hidden_columns)
 
-    def to_bytes(buffer):
-        write_styled_excel(df, buffer)
+    if df.height > EXCEL_MAX_ROWS:
+        extension = "csv"
+
+        def to_bytes(buffer):
+            write_csv(df, buffer)
+    else:
+        extension = "xlsx"
+
+        def to_bytes(buffer):
+            write_styled_excel(df, buffer)
 
     date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     track_download("/tableau")
-    return dcc.send_bytes(to_bytes, filename=f"decp_{date}.xlsx")
+    return dcc.send_bytes(to_bytes, filename=f"decp_{date}.{extension}")
 
 
 @callback(

@@ -74,20 +74,32 @@ def format_datetime_french(date_input) -> str:
     return f"{jour} {date_obj.year} à {date_obj.hour}h{date_obj.minute:02d}"
 
 
+EXCEL_MAX_ROWS = 100_000
+
+_CSV_DOWNLOAD_TITLE = (
+    "À partir de 100 000 lignes, le téléchargement se fait au format CSV, "
+    "en raison des limites du serveur."
+)
+
+
 def get_button_properties(height):
-    if height > 65000:
-        download_disabled = True
-        download_text = "Téléchargement désactivé au-delà de 65 000 lignes"
-        download_title = " Ajoutez des filtres pour réduire le nombre de lignes, Excel ne supporte pas d'avoir plus de 65 000 URLs dans une même feuille de calcul."
-    elif height == 0:
-        download_disabled = True
-        download_text = "Pas de données à télécharger"
-        download_title = ""
-    else:
-        download_disabled = False
-        download_text = "Télécharger au format Excel"
-        download_title = "Télécharger les données telles qu'affichées au format Excel"
-    return download_disabled, download_text, download_title
+    """État, texte, infobulle et format du bouton de téléchargement.
+
+    Au-delà de EXCEL_MAX_ROWS lignes, bascule du format Excel vers CSV au
+    lieu de désactiver le téléchargement (#142) : d'après des mesures faites
+    en production, Excel devient très lent et gourmand en mémoire au-delà de
+    100 000 lignes, alors que l'écriture CSV reste quasi instantanée. Le
+    bouton n'est donc plus jamais désactivé, sauf s'il n'y a aucune ligne à
+    télécharger.
+
+    Renvoie (disabled, text, title, format), format valant "xlsx" ou "csv".
+    """
+    if height == 0:
+        return True, "Pas de données à télécharger", "", "xlsx"
+    if height <= EXCEL_MAX_ROWS:
+        # Le bouton se suffit à lui-même : pas d'infobulle.
+        return False, "Télécharger au format Excel", "", "xlsx"
+    return False, "Télécharger au format CSV", _CSV_DOWNLOAD_TITLE, "csv"
 
 
 def get_enum_values_as_dict(column_name):

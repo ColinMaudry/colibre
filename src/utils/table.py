@@ -591,7 +591,12 @@ def prepare_table_data(
 
     dicts = dff.to_dicts()
 
-    download_disabled, download_text, download_title = get_button_properties(height)
+    # Le format (xlsx/csv) n'est pas utilisé ici : prepare_table_data ne
+    # pilote pas l'export, seulement l'état du bouton (voir les callbacks
+    # download_* de chaque page pour le choix du format).
+    download_disabled, download_text, download_title, _download_format = (
+        get_button_properties(height)
+    )
 
     return (
         dicts,
@@ -669,3 +674,16 @@ def write_styled_excel(df: pl.DataFrame, buffer, worksheet: str = "DECP") -> Non
         )
     finally:
         wb.close()
+
+
+def write_csv(df: pl.DataFrame, buffer) -> None:
+    """Écrit un CSV point-virgule avec BOM UTF-8, pour l'export au-delà de
+    EXCEL_MAX_ROWS lignes (#142).
+
+    Le point-virgule est le séparateur attendu par Excel en localisation
+    française (la virgule y sert de séparateur décimal). Le BOM UTF-8
+    (b"\\xef\\xbb\\xbf") permet à Excel de détecter l'encodage à l'ouverture
+    par double-clic ; sans lui, les caractères accentués sont mal interprétés.
+    """
+    buffer.write(b"\xef\xbb\xbf")
+    df.write_csv(buffer, separator=";")

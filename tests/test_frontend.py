@@ -24,3 +24,62 @@ def test_format_datetime_french_passthrough_on_garbage():
     from src.utils.frontend import format_datetime_french
 
     assert format_datetime_french("pas une date") == "pas une date"
+
+
+_CSV_DOWNLOAD_TITLE = (
+    "À partir de 100 000 lignes, le téléchargement se fait au format CSV, "
+    "en raison des limites du serveur."
+)
+
+
+def test_get_button_properties_zero_height_disables_download():
+    from src.utils.frontend import get_button_properties
+
+    disabled, text, title, fmt = get_button_properties(0)
+
+    assert disabled is True
+    assert text == "Pas de données à télécharger"
+    assert title == ""
+    assert fmt == "xlsx"
+
+
+def test_get_button_properties_excel_below_threshold_has_no_tooltip():
+    from src.utils.frontend import get_button_properties
+
+    disabled, text, title, fmt = get_button_properties(1)
+
+    assert disabled is False
+    assert text == "Télécharger au format Excel"
+    assert title == ""
+    assert fmt == "xlsx"
+
+
+def test_get_button_properties_excel_at_exact_threshold():
+    from src.utils.frontend import EXCEL_MAX_ROWS, get_button_properties
+
+    disabled, text, title, fmt = get_button_properties(EXCEL_MAX_ROWS)
+
+    assert disabled is False
+    assert text == "Télécharger au format Excel"
+    assert title == ""
+    assert fmt == "xlsx"
+
+
+def test_get_button_properties_csv_just_above_threshold():
+    from src.utils.frontend import EXCEL_MAX_ROWS, get_button_properties
+
+    disabled, text, title, fmt = get_button_properties(EXCEL_MAX_ROWS + 1)
+
+    assert disabled is False
+    assert text == "Télécharger au format CSV"
+    assert title == _CSV_DOWNLOAD_TITLE
+    assert fmt == "csv"
+
+
+def test_get_button_properties_csv_large_height_never_disables():
+    from src.utils.frontend import get_button_properties
+
+    disabled, _text, _title, fmt = get_button_properties(3_190_000)
+
+    assert disabled is False
+    assert fmt == "csv"
