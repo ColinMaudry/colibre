@@ -18,8 +18,32 @@ NAME = "Recherche"
 _STAT_STYLE = {"fontWeight": "bold", "color": "var(--primary-color-text)"}
 
 
+#: Largeurs fixes des colonnes de résultats, en pixels. Les clés d'identifiant
+#: et de nom sont données sans préfixe : les grilles acheteurs et titulaires
+#: ont la même structure, seul le préfixe des deux premières colonnes change.
+_RESULT_COLUMN_WIDTHS = {
+    "_id": 173,
+    "_nom": 247,
+    "Département": 135,
+    "Marchés": 95,
+}
+
+
+def _result_column_width(col: str) -> int | None:
+    """Largeur fixe d'une colonne de résultats, ou None si elle n'en a pas."""
+    for suffixe, largeur in _RESULT_COLUMN_WIDTHS.items():
+        if col == suffixe or (suffixe.startswith("_") and col.endswith(suffixe)):
+            return largeur
+    return None
+
+
 def _result_column_defs(dff: pl.DataFrame) -> list[dict]:
-    """columnDefs des résultats de recherche (liens markdown, infobulle d'en-tête)."""
+    """columnDefs des résultats de recherche (liens markdown, infobulle d'en-tête).
+
+    Les largeurs sont fixes (cf. `_RESULT_COLUMN_WIDTHS`) : `flex` est donc
+    absent du `defaultColDef` de la grille, sinon AG Grid étirerait les
+    colonnes pour occuper toute la largeur et ignorerait ces valeurs.
+    """
     defs = []
     for col in dff.columns:
         meta = DATA_SCHEMA.get(col, {})
@@ -30,6 +54,9 @@ def _result_column_defs(dff: pl.DataFrame) -> list[dict]:
             "wrapText": True,
             "autoHeight": True,
         }
+        largeur = _result_column_width(col)
+        if largeur is not None:
+            col_def["width"] = largeur
         if meta.get("description"):
             col_def["headerTooltip"] = meta["description"]
         defs.append(col_def)
@@ -332,8 +359,6 @@ def update_search_results(n_submit, n_clicks, query):
                             defaultColDef={
                                 "sortable": False,
                                 "filter": False,
-                                "flex": 1,
-                                "minWidth": 120,
                             },
                         ),
                     ],
