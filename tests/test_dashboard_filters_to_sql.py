@@ -229,7 +229,7 @@ def test_montant_min_only():
         dashboard_year="2025",
         dashboard_montant_min=1000,
     )
-    assert where_sql == 'YEAR("dateNotification") = ? AND "montant" >= ?'
+    assert where_sql == 'YEAR("dateNotification") = ? AND "montant_rationalise" >= ?'
     assert params == [2025, 1000]
 
 
@@ -238,7 +238,7 @@ def test_montant_max_only():
         dashboard_year="2025",
         dashboard_montant_max=500,
     )
-    assert where_sql == 'YEAR("dateNotification") = ? AND "montant" <= ?'
+    assert where_sql == 'YEAR("dateNotification") = ? AND "montant_rationalise" <= ?'
     assert params == [2025, 500]
 
 
@@ -248,7 +248,7 @@ def test_montant_zero_is_a_valid_lower_bound():
         dashboard_year="2025",
         dashboard_montant_min=0,
     )
-    assert where_sql == 'YEAR("dateNotification") = ? AND "montant" >= ?'
+    assert where_sql == 'YEAR("dateNotification") = ? AND "montant_rationalise" >= ?'
     assert params == [2025, 0]
 
 
@@ -259,6 +259,6 @@ def test_montant_min_and_max_combined():
         dashboard_montant_max=1000,
     )
     assert where_sql == (
-        'YEAR("dateNotification") = ? AND "montant" >= ? AND "montant" <= ?'
+        'YEAR("dateNotification") = ? AND "montant_rationalise" >= ? AND "montant_rationalise" <= ?'
     )
     assert params == [2025, 100, 1000]

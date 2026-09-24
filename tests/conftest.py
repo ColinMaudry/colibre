@@ -16,6 +16,10 @@ _TEST_DATA = [
         "titulaire_nom": "TITULAIRE 1",
         "titulaire_id": "345",
         "montant": 10,
+        # Montant retenu par les cards de l'observatoire et par le filtre
+        # montant du tableau de bord (cf. OBSERVATOIRE_CARDS_COLUMNS) : les
+        # cards le projettent sans garde, la colonne est donc obligatoire.
+        "montant_rationalise": 10,
         "dateNotification": datetime.date(2025, 1, 1),
         "codeCPV": "71600000",
         "donneesActuelles": True,

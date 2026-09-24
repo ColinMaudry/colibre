@@ -10,7 +10,9 @@ from src.utils.frontend import EXCEL_MAX_ROWS
 
 _UN_FILTRE = {"objet": {"filterType": "text", "type": "contains", "filter": "voirie"}}
 
-_MESSAGE_DATA_GOUV = "Le jeu de données complet est téléchargé depuis data.gouv.fr."
+_MESSAGE_DATA_GOUV = (
+    "Le jeu de données complet est téléchargé depuis data.gouv.fr au format CSV."
+)
 
 
 def test_update_meta_excel_sous_le_seuil():
