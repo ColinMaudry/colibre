@@ -240,7 +240,8 @@ def register_entity_grid_callbacks(org_type: str) -> None:
     def _download_filtered(_n, pathname, year, nom, filter_models, column_states):
         import datetime as _dt
 
-        from src.utils.table import write_styled_excel
+        from src.utils.frontend import EXCEL_MAX_ROWS
+        from src.utils.table import write_csv, write_styled_excel
 
         entity_id = (pathname or "").split("/")[-1]
         filter_model = (filter_models or [None])[0]
@@ -255,14 +256,25 @@ def register_entity_grid_callbacks(org_type: str) -> None:
             org_type, entity_id, year, filter_model, column_state
         )
 
-        def to_bytes(buffer):
-            write_styled_excel(df, buffer)
+        if df.height > EXCEL_MAX_ROWS:
+            extension = "csv"
+
+            def to_bytes(buffer):
+                write_csv(df, buffer)
+        else:
+            extension = "xlsx"
+
+            def to_bytes(buffer):
+                write_styled_excel(df, buffer)
 
         date = _dt.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         label = nom if isinstance(nom, str) else org_type
-        return dcc.send_bytes(to_bytes, filename=f"decp_filtrées_{label}_{date}.xlsx")
+        return dcc.send_bytes(
+            to_bytes, filename=f"decp_filtrées_{label}_{date}.{extension}"
+        )
 
-    # 6) Meta : "X marchés (Y lignes)" + état du bouton d'export filtré (seuil 65k).
+    # 6) Meta : "X marchés (Y lignes)" + état du bouton d'export filtré
+    #    (texte/infobulle Excel ↔ CSV selon get_button_properties).
     @callback(
         Output(f"{org_type}_nb_rows", "children"),
         Output(f"btn-download-filtered-data-{org_type}", "disabled"),
@@ -281,7 +293,5 @@ def register_entity_grid_callbacks(org_type: str) -> None:
             f"{format_number(total_unique) or 0} marchés "
             f"({format_number(total) or 0} lignes)"
         )
-        # Le format (xlsx/csv) n'est pas utilisé ici : l'export filtré de
-        # cette grille reste hors du périmètre de la bascule CSV (#142).
-        disabled, children, title, _format = get_button_properties(total)
+        disabled, children, title, download_format = get_button_properties(total)
         return nb_rows, disabled, children, title

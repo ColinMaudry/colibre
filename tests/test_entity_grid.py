@@ -152,10 +152,52 @@ def _get_meta_callback(org_type):
     raise AssertionError(f"_meta introuvable pour {org_type}")
 
 
-def test_meta_ignore_le_format_et_ne_desactive_jamais_au_dela_de_zero():
-    """get_button_properties renvoie désormais 4 valeurs ; _meta (bouton
-    d'export filtré) doit absorber le format sans le répercuter, et ne plus
-    jamais désactiver le bouton au-delà de 0 ligne (#142)."""
+def _get_download_filtered_callback(org_type):
+    """Récupère la fonction _download_filtered non décorée (closure de
+    register_entity_grid_callbacks), pour la tester directement."""
+    import dash
+
+    from src.app import app  # importe les pages → register_entity_grid_callbacks
+
+    registres = list(dash._callback.GLOBAL_CALLBACK_MAP.values()) + list(
+        app.callback_map.values()
+    )
+    for entree in registres:
+        fn = entree.get("callback")
+        if fn is None:
+            continue
+        wrapped = getattr(fn, "__wrapped__", None)
+        if wrapped is not None and wrapped.__name__ == "_download_filtered":
+            if str(entree.get("output", "")).startswith(
+                f"{org_type}-download-filtered-data"
+            ):
+                return wrapped
+    raise AssertionError(f"_download_filtered introuvable pour {org_type}")
+
+
+class _FakeDF:
+    """DataFrame minimal, avec une hauteur contrôlée."""
+
+    def __init__(self, height):
+        self.height = height
+
+
+def _fake_writers(captured):
+    def fake_write_styled_excel(_df, buffer, **_kwargs):
+        captured["used"] = "xlsx"
+        buffer.write(b"xlsx-data")
+
+    def fake_write_csv(_df, buffer):
+        captured["used"] = "csv"
+        buffer.write(b"csv-data")
+
+    return fake_write_styled_excel, fake_write_csv
+
+
+def test_meta_ne_desactive_jamais_au_dela_de_zero():
+    """get_button_properties renvoie 4 valeurs ; _meta (bouton d'export
+    filtré) ne doit plus jamais désactiver le bouton au-delà de 0 ligne
+    (#142)."""
     meta_acheteur = _get_meta_callback("acheteur")
 
     nb_rows, disabled, texte, titre = meta_acheteur(200_001, 5)
@@ -164,3 +206,95 @@ def test_meta_ignore_le_format_et_ne_desactive_jamais_au_dela_de_zero():
     assert "lignes" in nb_rows
     assert texte == "Télécharger au format CSV"
     assert titre
+
+
+def test_meta_et_export_filtre_annoncent_le_meme_format(monkeypatch):
+    """Passe de correction 1 (#142) : l'export filtré (grille acheteur/
+    titulaire) a été oublié du brief initial — _meta annonçait déjà le
+    format CSV au-delà du seuil, mais _download_filtered écrivait toujours
+    du xlsx, quel que soit le volume. Ce test vérifie que le format annoncé
+    par le bouton (_meta) et celui du fichier réellement produit
+    (_download_filtered) sont désormais identiques, de part et d'autre du
+    seuil."""
+    from src.utils import entity_grid as entity_grid_module
+    from src.utils import table as table_module
+    from src.utils.frontend import EXCEL_MAX_ROWS
+
+    meta_acheteur = _get_meta_callback("acheteur")
+    download_filtered_acheteur = _get_download_filtered_callback("acheteur")
+
+    for height, format_attendu, extension_attendue in [
+        (EXCEL_MAX_ROWS, "xlsx", ".xlsx"),
+        (EXCEL_MAX_ROWS + 1, "csv", ".csv"),
+    ]:
+        _nb_rows, disabled, texte, _titre = meta_acheteur(height, height)
+        assert disabled is False
+        format_annonce = "csv" if "CSV" in texte else "xlsx"
+        assert format_annonce == format_attendu
+
+        captured = {}
+        fake_xlsx, fake_csv = _fake_writers(captured)
+        monkeypatch.setattr(
+            entity_grid_module,
+            "export_entity_dataframe",
+            lambda *a, **kw: _FakeDF(height),
+        )
+        monkeypatch.setattr(table_module, "write_styled_excel", fake_xlsx)
+        monkeypatch.setattr(table_module, "write_csv", fake_csv)
+
+        resultat = download_filtered_acheteur(
+            1, "/acheteurs/123", "2025", "ACHETEUR 1", [None], [None]
+        )
+
+        assert captured["used"] == format_attendu
+        assert resultat["filename"].endswith(extension_attendue)
+
+
+def test_download_filtered_utilise_excel_sous_le_seuil(monkeypatch):
+    from src.utils import entity_grid as entity_grid_module
+    from src.utils import table as table_module
+    from src.utils.frontend import EXCEL_MAX_ROWS
+
+    download_filtered_titulaire = _get_download_filtered_callback("titulaire")
+
+    captured = {}
+    fake_xlsx, fake_csv = _fake_writers(captured)
+    monkeypatch.setattr(
+        entity_grid_module,
+        "export_entity_dataframe",
+        lambda *a, **kw: _FakeDF(EXCEL_MAX_ROWS),
+    )
+    monkeypatch.setattr(table_module, "write_styled_excel", fake_xlsx)
+    monkeypatch.setattr(table_module, "write_csv", fake_csv)
+
+    resultat = download_filtered_titulaire(
+        1, "/titulaires/345", "2025", "TITULAIRE 1", [None], [None]
+    )
+
+    assert captured["used"] == "xlsx"
+    assert resultat["filename"].endswith(".xlsx")
+
+
+def test_download_filtered_utilise_csv_au_dela_du_seuil(monkeypatch):
+    from src.utils import entity_grid as entity_grid_module
+    from src.utils import table as table_module
+    from src.utils.frontend import EXCEL_MAX_ROWS
+
+    download_filtered_titulaire = _get_download_filtered_callback("titulaire")
+
+    captured = {}
+    fake_xlsx, fake_csv = _fake_writers(captured)
+    monkeypatch.setattr(
+        entity_grid_module,
+        "export_entity_dataframe",
+        lambda *a, **kw: _FakeDF(EXCEL_MAX_ROWS + 1),
+    )
+    monkeypatch.setattr(table_module, "write_styled_excel", fake_xlsx)
+    monkeypatch.setattr(table_module, "write_csv", fake_csv)
+
+    resultat = download_filtered_titulaire(
+        1, "/titulaires/345", "2025", "TITULAIRE 1", [None], [None]
+    )
+
+    assert captured["used"] == "csv"
+    assert resultat["filename"].endswith(".csv")
