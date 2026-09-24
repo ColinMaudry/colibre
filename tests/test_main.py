@@ -118,8 +118,14 @@ def test_003_tableau_download(dash_duo: DashComposite):
     # Juste pour instancier l'app
     print(app.server.name)
 
+    # /tableau : sans filtre, le bouton renvoie désormais vers le CSV complet
+    # de data.gouv.fr au lieu de générer un fichier (#142) — un filterModel
+    # non vide est donc nécessaire ici pour exercer la génération réelle,
+    # comme avant cette bascule.
+    filtre = {"objet": {"filterType": "text", "type": "contains", "filter": "Objet"}}
+
     outputs = [
-        download_data(1, None, None),
+        download_data(1, filtre, None),
         download_acheteur_data(1, "/acheteurs/123", "2025", "ACHETEUR 1"),
         download_titulaire_data(1, "/titulaires/345", "2025", "TITULAIRE 1"),
     ]

@@ -59,6 +59,14 @@ from src.utils.table import (
 from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
 from src.utils.tracking import track_download, track_search
 
+# L'URL de l'API data.gouv.fr redirige toujours vers la dernière version
+# publiée du CSV complet des DECP (mise à jour quotidienne) : pas besoin de
+# générer nous-mêmes un export de 3,19 millions de lignes quand le tableau
+# n'a aucun filtre (#142).
+DECP_CSV_COMPLET_URL = (
+    "https://www.data.gouv.fr/api/1/datasets/r/22847056-61df-452d-837d-8b8ceadbfc52"
+)
+
 update_date_timestamp = get_data_update_timestamp(
     os.getenv("DATA_FILE_PARQUET_PATH", ""),
     os.getenv("DUCKDB_PATH", "./decp.duckdb"),
@@ -625,20 +633,36 @@ def get_rows_tableau(request):
     Output("btn-download-data", "disabled"),
     Output("btn-download-data", "children"),
     Output("btn-download-data", "title"),
+    Output("btn-download-data", "href"),
     Input("tableau-total", "data"),
     Input("tableau-total-unique", "data"),
+    Input("tableau_grid", "filterModel"),
 )
-def update_meta(total, total_unique):
+def update_meta(total, total_unique, filter_model):
     total = total or 0
     total_unique = total_unique or 0
     nb_rows = (
         f"{format_number(total_unique) or 0} marchés "
         f"({format_number(total) or 0} lignes)"
     )
+    if not filter_model:
+        # Aucun filtre (les colonnes masquées n'entrent pas en compte) :
+        # renvoyer directement vers le CSV complet publié sur data.gouv.fr
+        # plutôt que de générer un export de plusieurs millions de lignes.
+        # dbc.Button rend un <a> dès qu'il a un href, ce qui fait faire le
+        # téléchargement par le navigateur (avec reprise) sans quitter la
+        # page.
+        return (
+            nb_rows,
+            False,
+            "Télécharger toutes les données",
+            "Le jeu de données complet est téléchargé depuis data.gouv.fr.",
+            DECP_CSV_COMPLET_URL,
+        )
     download_disabled, download_text, download_title, _download_format = (
         get_button_properties(total)
     )
-    return nb_rows, download_disabled, download_text, download_title
+    return nb_rows, download_disabled, download_text, download_title, None
 
 
 @callback(
@@ -649,6 +673,12 @@ def update_meta(total, total_unique):
     prevent_initial_call=True,
 )
 def download_data(n_clicks, filter_model, column_state):
+    if not filter_model:
+        # Sans filtre, le bouton pointe déjà (via href) vers le CSV complet
+        # de data.gouv.fr — un clic ne doit pas en plus déclencher la
+        # génération d'un fichier de plusieurs millions de lignes ici.
+        return no_update
+
     from src.utils.grid import export_dataframe
 
     sort_model = [
@@ -657,8 +687,7 @@ def download_data(n_clicks, filter_model, column_state):
         if c.get("sort")
     ]
     hidden_columns = [c["colId"] for c in (column_state or []) if c.get("hide")]
-    if filter_model:
-        track_search(json.dumps(filter_model), "tab download")
+    track_search(json.dumps(filter_model), "tab download")
     df = export_dataframe(filter_model, sort_model, hidden_columns)
 
     if df.height > EXCEL_MAX_ROWS:

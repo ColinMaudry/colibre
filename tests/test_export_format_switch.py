@@ -4,9 +4,16 @@ Chaque callback d'export choisit `write_styled_excel` ou `write_csv` selon la
 hauteur du DataFrame produit, et nomme le fichier avec l'extension
 correspondante. Les sources de données et les fonctions d'écriture sont
 monkeypatchées pour ne fabriquer ni 100 001 vraies lignes, ni écriture disque.
+
+Pour `download_data` (/tableau), un filterModel non vide est fourni : depuis
+le renvoi vers le CSV complet de data.gouv.fr (#142, passe de correction 2),
+un filterModel vide fait sortir `download_data` en `no_update` avant même de
+regarder le format — cf. tests/test_tableau_download_button.py pour ce cas.
 """
 
 from src.utils.frontend import EXCEL_MAX_ROWS
+
+_UN_FILTRE = {"objet": {"filterType": "text", "type": "contains", "filter": "voirie"}}
 
 
 class _FakeDF:
@@ -47,7 +54,7 @@ def test_download_data_uses_excel_under_threshold(monkeypatch):
     monkeypatch.setattr(tableau, "write_styled_excel", fake_xlsx)
     monkeypatch.setattr(tableau, "write_csv", fake_csv)
 
-    result = tableau.download_data(1, None, None)
+    result = tableau.download_data(1, _UN_FILTRE, None)
 
     assert captured["used"] == "xlsx"
     assert result["filename"].endswith(".xlsx")
@@ -68,7 +75,7 @@ def test_download_data_uses_csv_above_threshold(monkeypatch):
     monkeypatch.setattr(tableau, "write_styled_excel", fake_xlsx)
     monkeypatch.setattr(tableau, "write_csv", fake_csv)
 
-    result = tableau.download_data(1, None, None)
+    result = tableau.download_data(1, _UN_FILTRE, None)
 
     assert captured["used"] == "csv"
     assert result["filename"].endswith(".csv")
