@@ -656,7 +656,7 @@ def update_meta(total, total_unique, filter_model):
             nb_rows,
             False,
             "Télécharger toutes les données",
-            "Le jeu de données complet est téléchargé depuis data.gouv.fr.",
+            "Le jeu de données complet est téléchargé depuis data.gouv.fr au format CSV.",
             DECP_CSV_COMPLET_URL,
         )
     download_disabled, download_text, download_title, _download_format = (
