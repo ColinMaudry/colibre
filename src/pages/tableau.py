@@ -860,6 +860,31 @@ def resolve_vue_from_url(search: str) -> dict | None:
     return saved_views_resolve.resolve_vue_param(values[0], schema)
 
 
+_ORG_FILTER_PARAMS = ("acheteur_id", "titulaire_id")
+
+
+def filtre_org_depuis_url(search: str) -> dict | None:
+    """Extrait ?acheteur_id= / ?titulaire_id= de la query string et les traduit
+    en filterModel AG Grid (filtre texte « égal à »). Renvoie None s'il n'y a
+    pas de paramètre d'organisme exploitable (valeur vide ou blanche ignorée).
+
+    La colonne correspondante n'a pas besoin d'être affichée : le filtrage de
+    la grille est fait côté serveur (filtermodel_to_ast → SQL), indépendamment
+    des columnDefs.
+    """
+    params = parse_qs((search or "").lstrip("?"))
+    filter_model = {}
+    for col in _ORG_FILTER_PARAMS:
+        values = params.get(col)
+        if values and values[0].strip():
+            filter_model[col] = {
+                "filterType": "text",
+                "type": "equals",
+                "filter": values[0].strip(),
+            }
+    return filter_model or None
+
+
 @callback(
     Output("vue-resolution", "data"),
     Input("tableau_url", "search"),
