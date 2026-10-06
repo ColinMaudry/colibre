@@ -61,3 +61,20 @@ def test_le_filtre_d_identifiant_passe_par_le_chemin_serveur():
     sql, params = ast_to_sql(ast, schema)
     assert "acheteur_id" in sql
     assert params == ["123"]
+
+
+def test_store_vue_resolution_ecartee_si_filtre_org_present():
+    # Les paramètres d'organisme priment sur une éventuelle vue partagée
+    assert (
+        tableau.store_vue_resolution("?vue=abc123_ma-vue&acheteur_id=123")
+        is dash.no_update
+    )
+
+
+def test_apply_org_filter_renvoie_le_filtermodel():
+    fm = {"acheteur_id": {"filterType": "text", "type": "equals", "filter": "123"}}
+    assert tableau.apply_org_filter(fm) == fm
+
+
+def test_apply_org_filter_sans_filtre_est_un_noop():
+    assert tableau.apply_org_filter(None) is dash.no_update

@@ -204,6 +204,8 @@ def _layout(a_un_abonnement: bool) -> list:
         dcc.Store(id="tableau-total-unique"),
         dcc.Store(id="active-view"),
         dcc.Store(id="vue-resolution"),
+        # Filtre d'organisme (?acheteur_id=/?titulaire_id=) résolu depuis l'URL
+        dcc.Store(id="org-filter-resolution"),
         html.Script(
             type="application/ld+json",
             id="dataset_jsonld",
@@ -890,8 +892,34 @@ def filtre_org_depuis_url(search: str) -> dict | None:
     Input("tableau_url", "search"),
 )
 def store_vue_resolution(search):
+    # Un filtre d'organisme dans l'URL (?acheteur_id=/?titulaire_id=) prime
+    # sur une éventuelle vue partagée (?vue=) : il réinitialise les filtres
+    # pour appliquer le sien, on n'applique donc pas aussi la vue.
+    if filtre_org_depuis_url(search) is not None:
+        return no_update
     resolution = resolve_vue_from_url(search)
     return resolution if resolution is not None else no_update
+
+
+@callback(
+    Output("org-filter-resolution", "data"),
+    Input("tableau_url", "search"),
+)
+def store_org_filter(search):
+    filtre = filtre_org_depuis_url(search)
+    return filtre if filtre is not None else no_update
+
+
+@callback(
+    Output("tableau_grid", "filterModel", allow_duplicate=True),
+    Input("org-filter-resolution", "data"),
+    prevent_initial_call=True,
+)
+def apply_org_filter(filtre):
+    # Réinitialise les filtres (remplace le filterModel persisté en
+    # localStorage) puis applique le filtre d'identifiant. Les tris et les
+    # colonnes ne sont pas touchés.
+    return filtre if filtre else no_update
 
 
 def apply_vue_resolution(resolution):
