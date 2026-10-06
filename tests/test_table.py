@@ -413,3 +413,34 @@ def test_hidden_columns_from_selection_accepte_la_forme_ids():
 
     assert masquees == [c for c in COLUMNS if c not in cochees]
     assert COLUMNS[1] in masquees
+
+
+def test_add_links_ajoute_le_raccourci_tableau(sample_lff):
+    from src.utils.table import add_links
+
+    dff = add_links(sample_lff.collect())
+    cell_acheteur = dff["acheteur_nom"][0]
+    cell_titulaire = dff["titulaire_nom"][0]
+    # Lien vers la page Tableau avec le bon paramètre d'URL
+    assert 'href="/tableau?acheteur_id=12345678900011"' in cell_acheteur
+    assert 'href="/tableau?titulaire_id=98765432100022"' in cell_titulaire
+    # L'icône porte le lien, avec une infobulle explicite
+    assert "/assets/icone-tableau.svg" in cell_acheteur
+    assert 'title="Voir dans le tableau"' in cell_acheteur
+    # Le raccourci Observatoire est conservé à côté
+    assert 'href="/observatoire?acheteur_id=12345678900011"' in cell_acheteur
+    assert 'href="/observatoire?titulaire_id=98765432100022"' in cell_titulaire
+
+
+def test_add_links_sans_raccourci_si_identifiant_non_siret():
+    from src.utils.table import add_links
+
+    dff = pl.DataFrame(
+        {
+            "titulaire_id": ["98765432100022"],
+            "titulaire_nom": ["Entreprise Test"],
+            "titulaire_typeIdentifiant": ["SIREN"],
+        }
+    )
+    out = add_links(dff)
+    assert "/tableau?" not in out["titulaire_nom"][0]

@@ -87,6 +87,15 @@ def add_links(dff: pl.DataFrame):
                         + pl.col("titulaire_id")
                         + '" title="Voir dans l\'observatoire">📊</a>'
                     )
+                    detail_link = (
+                        detail_link
+                        + ' <a href="/tableau?titulaire_id='
+                        + pl.col("titulaire_id")
+                        + '" title="Voir dans le tableau">'
+                        + '<img src="/assets/icone-tableau.svg" '
+                        + 'alt="Voir dans le tableau" '
+                        + 'style="height:14px;vertical-align:middle;" /></a>'
+                    )
                 dff = dff.with_columns(
                     pl.when(
                         pl.Expr.or_(
@@ -112,6 +121,15 @@ def add_links(dff: pl.DataFrame):
                         + ' <a href="/observatoire?acheteur_id='
                         + pl.col("acheteur_id")
                         + '" title="Voir dans l\'observatoire">📊</a>'
+                    )
+                    detail_link = (
+                        detail_link
+                        + ' <a href="/tableau?acheteur_id='
+                        + pl.col("acheteur_id")
+                        + '" title="Voir dans le tableau">'
+                        + '<img src="/assets/icone-tableau.svg" '
+                        + 'alt="Voir dans le tableau" '
+                        + 'style="height:14px;vertical-align:middle;" /></a>'
                     )
                 dff = dff.with_columns(detail_link.alias(col))
             if col == "uid":
