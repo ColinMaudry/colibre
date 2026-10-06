@@ -887,6 +887,27 @@ def filtre_org_depuis_url(search: str) -> dict | None:
     return filter_model or None
 
 
+def devoiler_colonnes_filtre_org(filtre: dict | None, colonnes_masquees: list | None):
+    """Retire les colonnes du filtre d'organisme des colonnes masquées, pour
+    que l'utilisateur puisse voir la valeur filtrée et changer d'organisme
+    sans passer par le sélecteur « Colonnes ».
+
+    `colonnes_masquees` à None = pas encore de préférence enregistrée : on
+    part des colonnes masquées par défaut. Renvoie None si rien n'est à
+    changer (callback → no_update : pas de réécriture du store).
+    """
+    if not filtre:
+        return None
+    reference = (
+        colonnes_masquees
+        if colonnes_masquees is not None
+        else get_default_hidden_columns("tableau")
+    )
+    if not any(col in reference for col in filtre):
+        return None
+    return [col for col in reference if col not in filtre]
+
+
 @callback(
     Output("vue-resolution", "data"),
     Input("tableau_url", "search"),
@@ -917,9 +938,23 @@ def store_org_filter(search):
 )
 def apply_org_filter(filtre):
     # Réinitialise les filtres (remplace le filterModel persisté en
-    # localStorage) puis applique le filtre d'identifiant. Les tris et les
-    # colonnes ne sont pas touchés.
+    # localStorage) puis applique le filtre d'identifiant. Les tris ne sont
+    # pas touchés ; la colonne filtrée est affichée par
+    # afficher_colonnes_du_filtre_org pour que la valeur reste éditable.
     return filtre if filtre else no_update
+
+
+@callback(
+    Output("tableau-hidden-columns", "data", allow_duplicate=True),
+    Input("org-filter-resolution", "data"),
+    State("tableau-hidden-columns", "data"),
+    prevent_initial_call=True,
+)
+def afficher_colonnes_du_filtre_org(filtre, colonnes_masquees):
+    # Écrire le store régénère les columnDefs (apply_hidden_columns) avec la
+    # colonne affichée, et garde le sélecteur « Colonnes » cohérent.
+    nouvelles = devoiler_colonnes_filtre_org(filtre, colonnes_masquees)
+    return nouvelles if nouvelles is not None else no_update
 
 
 def apply_vue_resolution(resolution):
