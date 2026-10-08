@@ -102,3 +102,19 @@ def test_fiche_acheteur_pastille_et_suppression(dash_duo):
         lambda _d: not dash_duo.find_elements("#acheteur-filter-pills .filter-pill")
     )
     assert dash_duo.find_element(champ).get_attribute("value") == ""
+
+
+def test_fiche_acheteur_clic_pastille_focus_du_filtre(dash_duo):
+    # Grille à id dict (pattern-matching) : getApi + id DOM sérialisé.
+    _demarrer(dash_duo, "/acheteurs/123")
+    champ = '#acheteur-grid-container .ag-floating-filter[col-id="objet"] input'
+    dash_duo.wait_for_element(champ, timeout=15)
+    dash_duo.find_element(champ).send_keys("test")
+    dash_duo.wait_for_element("#acheteur-filter-pills .filter-pill-body", timeout=10)
+    dash_duo.driver.execute_script("document.activeElement.blur()")
+
+    dash_duo.find_element("#acheteur-filter-pills .filter-pill-body").click()
+
+    WebDriverWait(dash_duo.driver, 15).until(
+        lambda d: d.execute_script(_ACTIF) == ["INPUT", "objet"]
+    )
