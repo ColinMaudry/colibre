@@ -247,7 +247,12 @@ def layout(acheteur_id=None, **kwargs):
                             className="table-toolbar",
                         ),
                         html.Div(
-                            html.Span(id="acheteur_nb_rows"),
+                            [
+                                html.Span(id="acheteur_nb_rows"),
+                                html.Span(
+                                    id="acheteur-filter-pills", className="filter-pills"
+                                ),
+                            ],
                             className="table-meta",
                         ),
                         dbc.Modal(

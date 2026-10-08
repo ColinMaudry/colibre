@@ -369,6 +369,35 @@ input[type="email"] {
   color: #b33821;
 }
 
+/* Pastilles des filtres appliqués (#148), à la suite de la ligne d'info.
+   inline-flex (et non .table-meta en flex) : les « · » gardent leurs espaces. */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  margin: 2px 0 2px 8px;
+  border-radius: 999px;
+  background: #e9ecef;
+  color: #343a40;
+  vertical-align: middle;
+}
+.filter-pill button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.filter-pill-body {
+  padding: 1px 4px 1px 10px;
+}
+.filter-pill-remove {
+  padding: 1px 10px 1px 4px;
+  font-weight: bold;
+}
+.filter-pill-remove:hover {
+  color: #b33821;
+}
+
 /* Légende des boutons en tête du mode d'emploi : boutons reproduits à
    l'identique mais inertes, alignés en face de leur fonction. */
 .help-legend-table {
@@ -1543,6 +1572,13 @@ input[type="number"] {
   color: var(--earth-muted);
 }
 [data-bs-theme="dark"] .table-meta .dl-hint {
+  color: var(--earth-primary);
+}
+[data-bs-theme="dark"] .filter-pill {
+  background: #3a3f44;
+  color: #dee2e6;
+}
+[data-bs-theme="dark"] .filter-pill-remove:hover {
   color: var(--earth-primary);
 }
 

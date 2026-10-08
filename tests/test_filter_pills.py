@@ -1,7 +1,7 @@
 import pytest
 
 import src.app  # noqa: F401  # instancie l'app → register_page()
-from src.utils.filter_pills import describe_filter
+from src.utils.filter_pills import describe_filter, filter_pills
 
 NB = "\u00a0"
 
@@ -98,3 +98,20 @@ def _date(type_, date_from, date_to=None):
 )
 def test_describe_filter(col, spec, attendu):
     assert describe_filter(col, spec) == attendu
+
+
+def test_filter_pills_sans_filtre():
+    assert filter_pills(None, "tableau") == []
+    assert filter_pills({}, "tableau") == []
+
+
+def test_filter_pills_ids_par_colonne():
+    fm = {
+        "montant": _num("greaterThan", 5),
+        "acheteur_id": _txt("equals", "123"),
+    }
+    pills = filter_pills(fm, "acheteur")
+    body, remove = pills[0].children
+    assert body.id == {"type": "acheteur-filter-pill", "col": "montant"}
+    assert remove.id == {"type": "acheteur-filter-pill-remove", "col": "montant"}
+    assert pills[1].children[0].id["col"] == "acheteur_id"

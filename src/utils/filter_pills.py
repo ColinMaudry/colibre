@@ -4,6 +4,8 @@ Une pastille par colonne filtrée, dans la ligne `.table-meta` de la page
 Tableau et des fiches acheteur/titulaire : « **Libellé** opérateur valeur × ».
 """
 
+from dash import Input, Output, callback, html
+
 from src.figures import DATA_SCHEMA
 from src.utils.table import format_number
 
@@ -60,3 +62,57 @@ def describe_filter(col: str, spec: dict) -> tuple[str, str]:
         jointure = _JOINTURES.get(spec.get("operator"), " et ")
         return label, jointure.join(_condition(c) for c in conditions)
     return label, _condition(spec)
+
+
+def filter_pills(filter_model: dict | None, context: str) -> list:
+    """Une pastille par colonne filtrée, dans l'ordre du filterModel.
+
+    Corps et croix sont deux boutons frères : un clic sur la croix ne compte
+    pas comme un clic sur la pastille (pas de propagation vers un parent à id).
+    """
+    pills = []
+    for col, spec in (filter_model or {}).items():
+        label, expression = describe_filter(col, spec)
+        pills.append(
+            html.Span(
+                [
+                    html.Button(
+                        [html.Strong(label), " " + expression],
+                        id={"type": f"{context}-filter-pill", "col": col},
+                        className="filter-pill-body",
+                        title="Modifier ce filtre",
+                    ),
+                    html.Button(
+                        "×",
+                        id={"type": f"{context}-filter-pill-remove", "col": col},
+                        className="filter-pill-remove",
+                        title=f"Supprimer le filtre {label}",
+                    ),
+                ],
+                className="filter-pill",
+            )
+        )
+    return pills
+
+
+def _premier(valeur):
+    """Grilles des fiches (id pattern-matching ALL) : liste d'une valeur au plus."""
+    if isinstance(valeur, list):
+        return valeur[0] if valeur else None
+    return valeur
+
+
+def register_filter_pills_callbacks(
+    context: str, grid_id: "str | dict", clear_active_view: bool = False
+) -> None:
+    """Callbacks des pastilles pour une page (`tableau`, `acheteur`, `titulaire`).
+
+    `grid_id` : id fixe de la grille, ou motif ALL pour les grilles des fiches.
+    """
+
+    @callback(
+        Output(f"{context}-filter-pills", "children"),
+        Input(grid_id, "filterModel"),
+    )
+    def _render(filter_model):
+        return filter_pills(_premier(filter_model), context)

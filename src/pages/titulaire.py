@@ -263,7 +263,13 @@ def layout(titulaire_id=None, **kwargs):
                             className="table-toolbar",
                         ),
                         html.Div(
-                            html.Span(id="titulaire_nb_rows"),
+                            [
+                                html.Span(id="titulaire_nb_rows"),
+                                html.Span(
+                                    id="titulaire-filter-pills",
+                                    className="filter-pills",
+                                ),
+                            ],
                             className="table-meta",
                         ),
                         dbc.Modal(

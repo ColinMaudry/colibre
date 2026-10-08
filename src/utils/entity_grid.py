@@ -28,6 +28,7 @@ from src.figures import (
     AG_GRID_LOCALE_FR,  # noqa: F401  (réexport pratique)
     ag_grid,
 )
+from src.utils.filter_pills import register_filter_pills_callbacks
 from src.utils.grid import (
     apply_persisted_layout,
     export_dataframe,
@@ -224,6 +225,11 @@ def register_entity_grid_callbacks(org_type: str) -> None:
     def _reset(_n, column_states):
         cleared = [clear_sort(cs) for cs in (column_states or [])]
         return [{} for _ in cleared], cleared
+
+    # 4bis) Pastilles des filtres appliqués (#148).
+    register_filter_pills_callbacks(
+        org_type, {"type": gtype, "entity_id": ALL, "year": ALL}
+    )
 
     # 5) Export filtré (état courant de la grille). Bouton fixe → Download fixe,
     #    lit filterModel/columnState de la grille via ALL (state).

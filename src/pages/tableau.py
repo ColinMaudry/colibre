@@ -38,6 +38,7 @@ from src.saved_views import ui as saved_views_ui
 from src.theme import current_theme
 from src.utils import get_data_update_timestamp, logger
 from src.utils.cache import cache
+from src.utils.filter_pills import register_filter_pills_callbacks
 from src.utils.frontend import EXCEL_MAX_ROWS, get_button_properties
 from src.utils.grid import apply_persisted_layout, fetch_grid_page, grid_column_defs
 from src.utils.query_ast import (
@@ -564,6 +565,9 @@ def _layout(a_un_abonnement: bool) -> list:
                                 html.Span(
                                     " · Données mises à jour le " + str(update_date)
                                 ),
+                                html.Span(
+                                    id="tableau-filter-pills", className="filter-pills"
+                                ),
                             ],
                         ),
                         dbc.Modal(
@@ -679,6 +683,9 @@ def update_meta(total, total_unique, filter_model):
         get_button_properties(total)
     )
     return nb_rows, download_disabled, download_text, download_title, None
+
+
+register_filter_pills_callbacks("tableau", "tableau_grid", clear_active_view=True)
 
 
 @callback(
