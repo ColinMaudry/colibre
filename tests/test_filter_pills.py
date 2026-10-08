@@ -3,6 +3,7 @@ import pytest
 import src.app  # noqa: F401  # instancie l'app → register_page()
 from src.utils.filter_pills import (
     col_cliquee,
+    colonnes_masquees_sans,
     describe_filter,
     filter_model_sans,
     filter_pills,
@@ -143,3 +144,22 @@ def test_col_cliquee_ignore_le_rerendu():
 def test_col_cliquee_renvoie_la_colonne():
     trig = {"type": "tableau-filter-pill-remove", "col": "montant"}
     assert col_cliquee(trig, 1) == "montant"
+
+
+def test_colonnes_masquees_sans_devoile_la_colonne():
+    out = colonnes_masquees_sans("acheteur_id", ["acheteur_id", "montant"], "tableau")
+    assert out == ["montant"]
+
+
+def test_colonnes_masquees_sans_colonne_deja_visible():
+    assert colonnes_masquees_sans("acheteur_id", ["montant"], "tableau") is None
+
+
+def test_colonnes_masquees_sans_preference_part_des_defauts():
+    from src.utils.table import get_default_hidden_columns
+
+    defauts = get_default_hidden_columns("tableau")
+    assert "acheteur_id" in defauts  # précondition
+    out = colonnes_masquees_sans("acheteur_id", None, "tableau")
+    assert "acheteur_id" not in out
+    assert set(out) == set(defauts) - {"acheteur_id"}

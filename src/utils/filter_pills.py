@@ -4,10 +4,21 @@ Une pastille par colonne filtrée, dans la ligne `.table-meta` de la page
 Tableau et des fiches acheteur/titulaire : « **Libellé** opérateur valeur × ».
 """
 
-from dash import ALL, Input, Output, State, callback, ctx, html, no_update
+from dash import (
+    ALL,
+    ClientsideFunction,
+    Input,
+    Output,
+    State,
+    callback,
+    clientside_callback,
+    ctx,
+    html,
+    no_update,
+)
 
 from src.figures import DATA_SCHEMA
-from src.utils.table import format_number
+from src.utils.table import format_number, get_default_hidden_columns
 
 _OPERATEURS = {
     "equals": "=",
@@ -108,6 +119,21 @@ def col_cliquee(triggered_id, triggered_value) -> str | None:
     return triggered_id.get("col")
 
 
+def colonnes_masquees_sans(
+    col: str, colonnes_masquees: list | None, context: str
+) -> list | None:
+    """Colonnes masquées sans `col` (store à None = colonnes masquées par
+    défaut de la page). None si `col` est déjà affichée : pas de réécriture."""
+    reference = (
+        colonnes_masquees
+        if colonnes_masquees is not None
+        else get_default_hidden_columns(context)
+    )
+    if col not in reference:
+        return None
+    return [c for c in reference if c != col]
+
+
 def _premier(valeur):
     """Grilles des fiches (id pattern-matching ALL) : liste d'une valeur au plus."""
     if isinstance(valeur, list):
@@ -151,3 +177,29 @@ def register_filter_pills_callbacks(
         # Le filterModel posé par callback a la source 'api' : ignoré par
         # hideShareOnUserAction, on efface donc active-view ici (Tableau).
         return [nouveau, None][: len(sorties)]
+
+    # Clic sur une pastille : 1) affiche la colonne si elle est masquée, via le
+    # store du sélecteur « Colonnes » (régénère les columnDefs et garde les
+    # cases à cocher cohérentes) ; 2) côté client, attend que la colonne soit
+    # affichée puis place le curseur dans son filtre (src/assets/filter_pills.js).
+    pastille = Input({"type": f"{context}-filter-pill", "col": ALL}, "n_clicks")
+
+    @callback(
+        Output(f"{context}-hidden-columns", "data", allow_duplicate=True),
+        pastille,
+        State(f"{context}-hidden-columns", "data"),
+        prevent_initial_call=True,
+    )
+    def _devoiler(_n_clicks, colonnes_masquees):
+        col = col_cliquee(ctx.triggered_id, ctx.triggered[0]["value"])
+        if col is None:
+            return no_update
+        nouvelles = colonnes_masquees_sans(col, colonnes_masquees, context)
+        return nouvelles if nouvelles is not None else no_update
+
+    clientside_callback(
+        ClientsideFunction("filterPills", "focusFilter"),
+        pastille,
+        State(grid_id, "id"),
+        prevent_initial_call=True,
+    )
