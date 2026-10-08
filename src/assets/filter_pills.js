@@ -31,20 +31,14 @@
     return cellule && cellule.querySelector("input");
   }
 
-  function focaliser(api, grille, col) {
-    api.ensureColumnVisible(col);
-    // Colonnes virtualisées : l'en-tête n'existe qu'une fois la colonne
-    // amenée dans la zone visible.
-    requestAnimationFrame(function () {
-      var champ = champDuFiltre(grille, col);
-      if (champ && !champ.disabled && !champ.readOnly) {
-        champ.focus();
-      } else {
-        // Filtre flottant en lecture seule (plusieurs conditions, plage,
-        // vide) : on ouvre le filtre complet de la colonne.
-        api.showColumnFilter(col);
-      }
-    });
+  function agir(api, champ, col) {
+    if (!champ.disabled && !champ.readOnly) {
+      champ.focus();
+    } else {
+      // Filtre flottant en lecture seule (plusieurs conditions, plage,
+      // vide) : on ouvre le filtre complet de la colonne.
+      api.showColumnFilter(col);
+    }
   }
 
   window.dash_clientside = Object.assign({}, window.dash_clientside, {
@@ -69,11 +63,25 @@
         var grille = document.getElementById(stringifyId(gridId));
         var col = id.col;
         var limite = Date.now() + DELAI_MAX_MS;
+        var defilee = false;
+        // 1) la colonne est affichée (callback serveur si elle était masquée) ;
+        // 2) on la fait défiler à l'écran ; 3) on attend que son filtre
+        // flottant soit rendu (en-têtes virtualisés : il n'existe pas tant que
+        // la colonne est hors écran, et showColumnFilter n'aurait pas d'ancre).
         (function attendre() {
           var colonne = api.getColumn(col);
           if (colonne && colonne.isVisible()) {
-            focaliser(api, grille, col);
-          } else if (Date.now() < limite) {
+            if (!defilee) {
+              api.ensureColumnVisible(col);
+              defilee = true;
+            }
+            var champ = champDuFiltre(grille, col);
+            if (champ) {
+              agir(api, champ, col);
+              return;
+            }
+          }
+          if (Date.now() < limite) {
             setTimeout(attendre, PAS_MS);
           }
         })();

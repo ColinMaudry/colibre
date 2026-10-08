@@ -59,6 +59,34 @@ def test_tableau_clic_pastille_colonne_masquee_affiche_et_focus(dash_duo):
     )
 
 
+def test_tableau_clic_pastille_multi_conditions_hors_ecran_ouvre_le_filtre(dash_duo):
+    # Filtre flottant en lecture seule (deux conditions) sur la dernière
+    # colonne affichée, hors écran (fenêtre étroite → en-tête virtualisé) :
+    # le clic doit ouvrir le filtre complet de la colonne.
+    _demarrer(dash_duo, "/tableau")
+    dash_duo.driver.set_window_size(700, 900)
+    dash_duo.wait_for_element("#tableau_grid .ag-floating-filter", timeout=15)
+    col = dash_duo.driver.execute_script(
+        """
+        const api = dash_ag_grid.getApi("tableau_grid");
+        const col = api.getAllDisplayedColumns().at(-1).getColId();
+        api.setFilterModel({[col]: {filterType: "text", operator: "OR", conditions: [
+            {filterType: "text", type: "contains", filter: "a"},
+            {filterType: "text", type: "contains", filter: "b"}]}});
+        api.ensureColumnVisible("marche");
+        return col;
+        """
+    )
+    dash_duo.wait_for_element("#tableau-filter-pills .filter-pill-body", timeout=10)
+    assert not dash_duo.find_elements(
+        f'#tableau_grid .ag-floating-filter[col-id="{col}"]'
+    ), "la colonne cible doit être hors écran pour ce test"
+
+    dash_duo.find_element("#tableau-filter-pills .filter-pill-body").click()
+
+    dash_duo.wait_for_element(".ag-filter-wrapper", timeout=10)
+
+
 def test_fiche_acheteur_pastille_et_suppression(dash_duo):
     _demarrer(dash_duo, "/acheteurs/123")
     champ = '#acheteur-grid-container .ag-floating-filter[col-id="objet"] input'
