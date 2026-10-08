@@ -1,7 +1,12 @@
 import pytest
 
 import src.app  # noqa: F401  # instancie l'app → register_page()
-from src.utils.filter_pills import describe_filter, filter_pills
+from src.utils.filter_pills import (
+    col_cliquee,
+    describe_filter,
+    filter_model_sans,
+    filter_pills,
+)
 
 NB = "\u00a0"
 
@@ -115,3 +120,26 @@ def test_filter_pills_ids_par_colonne():
     assert body.id == {"type": "acheteur-filter-pill", "col": "montant"}
     assert remove.id == {"type": "acheteur-filter-pill-remove", "col": "montant"}
     assert pills[1].children[0].id["col"] == "acheteur_id"
+
+
+def test_filter_model_sans_retire_la_colonne():
+    fm = {"montant": _num("greaterThan", 5), "acheteur_id": _txt("equals", "123")}
+    assert filter_model_sans(fm, "montant") == {"acheteur_id": _txt("equals", "123")}
+    assert "montant" in fm  # pas de mutation du State
+
+
+def test_filter_model_sans_dernier_filtre_donne_un_modele_vide():
+    assert filter_model_sans({"montant": _num("greaterThan", 5)}, "montant") == {}
+
+
+def test_col_cliquee_ignore_le_rerendu():
+    assert (
+        col_cliquee({"type": "tableau-filter-pill-remove", "col": "montant"}, None)
+        is None
+    )
+    assert col_cliquee(None, 1) is None
+
+
+def test_col_cliquee_renvoie_la_colonne():
+    trig = {"type": "tableau-filter-pill-remove", "col": "montant"}
+    assert col_cliquee(trig, 1) == "montant"

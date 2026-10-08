@@ -4,7 +4,7 @@ Une pastille par colonne filtrée, dans la ligne `.table-meta` de la page
 Tableau et des fiches acheteur/titulaire : « **Libellé** opérateur valeur × ».
 """
 
-from dash import Input, Output, callback, html
+from dash import ALL, Input, Output, State, callback, ctx, html, no_update
 
 from src.figures import DATA_SCHEMA
 from src.utils.table import format_number
@@ -95,6 +95,19 @@ def filter_pills(filter_model: dict | None, context: str) -> list:
     return pills
 
 
+def filter_model_sans(filter_model: dict | None, col: str) -> dict:
+    """Copie du filterModel sans le filtre de `col`."""
+    return {c: spec for c, spec in (filter_model or {}).items() if c != col}
+
+
+def col_cliquee(triggered_id, triggered_value) -> str | None:
+    """Colonne de la pastille cliquée, ou None si le déclenchement vient d'un
+    (re)rendu des pastilles (nouveaux boutons, n_clicks à None)."""
+    if not isinstance(triggered_id, dict) or not triggered_value:
+        return None
+    return triggered_id.get("col")
+
+
 def _premier(valeur):
     """Grilles des fiches (id pattern-matching ALL) : liste d'une valeur au plus."""
     if isinstance(valeur, list):
@@ -116,3 +129,25 @@ def register_filter_pills_callbacks(
     )
     def _render(filter_model):
         return filter_pills(_premier(filter_model), context)
+
+    sorties = [Output(grid_id, "filterModel", allow_duplicate=True)]
+    if clear_active_view:
+        sorties.append(Output("active-view", "data", allow_duplicate=True))
+
+    @callback(
+        sorties,  # liste : le retour est toujours une liste, même à une sortie
+        Input({"type": f"{context}-filter-pill-remove", "col": ALL}, "n_clicks"),
+        State(grid_id, "filterModel"),
+        prevent_initial_call=True,
+    )
+    def _remove(_n_clicks, filter_model):
+        col = col_cliquee(ctx.triggered_id, ctx.triggered[0]["value"])
+        if col is None:
+            return [no_update] * len(sorties)
+        if isinstance(filter_model, list):  # grilles des fiches (ALL)
+            nouveau = [filter_model_sans(fm, col) for fm in filter_model]
+        else:
+            nouveau = filter_model_sans(filter_model, col)
+        # Le filterModel posé par callback a la source 'api' : ignoré par
+        # hideShareOnUserAction, on efface donc active-view ici (Tableau).
+        return [nouveau, None][: len(sorties)]
