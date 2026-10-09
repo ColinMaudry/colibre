@@ -2,6 +2,7 @@ import pytest
 
 import src.app  # noqa: F401  # instancie l'app → register_page()
 from src.utils.filter_pills import (
+    BANNIERE_OPERATEURS,
     col_cliquee,
     colonnes_masquees_sans,
     describe_filter,
@@ -103,12 +104,70 @@ def _date(type_, date_from, date_to=None):
     ],
 )
 def test_describe_filter(col, spec, attendu):
-    assert describe_filter(col, spec) == attendu
+    assert describe_filter(col, spec, True)[:2] == attendu
+
+
+def test_pastille_corrigee():
+    desc = describe_filter("objet", _txt("contains", "(béton OU"), True)
+    assert desc.expression == "contient béton (parenthèse manquante, OU orphelin)"
+    assert desc.corrigee is True
+    pills = filter_pills({"objet": _txt("contains", "(béton OU")}, "tableau", True)
+    assert pills[0].className == "filter-pill filter-pill-warning"
+
+
+def test_pastille_propre_sans_classe():
+    desc = describe_filter("objet", _txt("contains", "béton OU ciment"), True)
+    assert desc.expression == "contient béton OU ciment"
+    assert desc.corrigee is False
+    pills = filter_pills(
+        {"objet": _txt("contains", "béton OU ciment")}, "tableau", True
+    )
+    assert pills[0].className == "filter-pill"
+
+
+def test_expression_vide():
+    assert (
+        describe_filter("objet", _txt("contains", "ET"), True).expression
+        == "n'est pas vide (ET orphelin)"
+    )
+    assert (
+        describe_filter("objet", _txt("notContains", "ET"), True).expression
+        == "est vide (ET orphelin)"
+    )
+
+
+def test_deux_conditions():
+    spec = {
+        "filterType": "text",
+        "operator": "OR",
+        "conditions": [_txt("contains", "béton OU"), _txt("contains", "brique")],
+    }
+    desc = describe_filter("objet", spec, True)
+    assert desc.expression == "contient béton (OU orphelin) ou contient brique"
+    assert desc.corrigee is True
+
+
+def test_non_abonne_saisie_telle_quelle():
+    desc = describe_filter("objet", _txt("contains", "(béton OU"), False)
+    assert desc.expression == "contient (béton OU"
+    assert desc.corrigee is False
+    assert desc.operateurs_ignores is True
+
+
+def test_bandeau_non_abonne():
+    fm = {"objet": _txt("contains", "béton OU ciment")}
+    pills = filter_pills(fm, "tableau", False)
+    assert len(pills) == 2
+    assert pills[-1].className == "filter-pills-banniere"
+    assert BANNIERE_OPERATEURS in pills[-1].children
+    assert len(filter_pills(fm, "tableau", True)) == 1
+    phrase = {"objet": _txt("contains", '"béton OU ciment"')}
+    assert len(filter_pills(phrase, "tableau", False)) == 1
 
 
 def test_filter_pills_sans_filtre():
-    assert filter_pills(None, "tableau") == []
-    assert filter_pills({}, "tableau") == []
+    assert filter_pills(None, "tableau", True) == []
+    assert filter_pills({}, "tableau", True) == []
 
 
 def test_filter_pills_ids_par_colonne():
@@ -116,7 +175,7 @@ def test_filter_pills_ids_par_colonne():
         "montant": _num("greaterThan", 5),
         "acheteur_id": _txt("equals", "123"),
     }
-    pills = filter_pills(fm, "acheteur")
+    pills = filter_pills(fm, "acheteur", True)
     body, remove = pills[0].children
     assert body.id == {"type": "acheteur-filter-pill", "col": "montant"}
     assert remove.id == {"type": "acheteur-filter-pill-remove", "col": "montant"}

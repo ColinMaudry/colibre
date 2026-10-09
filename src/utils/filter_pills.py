@@ -4,6 +4,8 @@ Une pastille par colonne filtrée, dans la ligne `.table-meta` de la page
 Tableau et des fiches acheteur/titulaire : « **Libellé** opérateur valeur × ».
 """
 
+from typing import NamedTuple
+
 from dash import (
     ALL,
     ClientsideFunction,
@@ -20,6 +22,7 @@ from dash.exceptions import PreventUpdate
 
 from src.figures import DATA_SCHEMA
 from src.utils.table import format_number, get_default_hidden_columns
+from src.utils.text_query import analyser, en_texte, libelle_corrections
 
 _OPERATEURS = {
     "equals": "=",
@@ -37,6 +40,19 @@ _OPERATEURS = {
 }
 _SANS_VALEUR = {"blank", "notBlank"}
 _JOINTURES = {"AND": " et ", "OR": " ou "}
+_TEXTE_BOOLEEN = {"contains", "notContains"}
+_EXPRESSION_VIDE = {"contains": "n'est pas vide", "notContains": "est vide"}
+
+BANNIERE_OPERATEURS = (
+    "Les opérateurs OU, ET, PAS et les parenthèses sont réservés aux abonné·es."
+)
+
+
+class Description(NamedTuple):
+    label: str
+    expression: str
+    corrigee: bool
+    operateurs_ignores: bool
 
 
 def _valeur(filter_type: str, value) -> str:
@@ -51,45 +67,83 @@ def _valeur(filter_type: str, value) -> str:
     return str(value)
 
 
-def _condition(spec: dict) -> str:
+def _condition(spec: dict, operateurs: bool) -> tuple[str, bool, bool]:
+    """(texte, corrigée, opérateurs ignorés) d'une condition du filterModel."""
     filter_type = spec.get("filterType")
     type_ = spec.get("type")
     operateur = _OPERATEURS.get(type_, type_)
     if type_ in _SANS_VALEUR:
-        return operateur
+        return operateur, False, False
+    if filter_type == "text" and type_ in _TEXTE_BOOLEEN:
+        # Décrit le filtre réellement appliqué par le SQL (#97)
+        expression = analyser(str(spec.get("filter") or ""), operateurs)
+        texte = en_texte(expression)
+        if not texte:
+            operateur = _EXPRESSION_VIDE[type_]
+        resultat = f"{operateur} {texte}" if texte else operateur
+        if expression.corrections:
+            resultat += f" ({libelle_corrections(expression)})"
+        return (
+            resultat,
+            bool(expression.corrections),
+            expression.operateurs_ignores,
+        )
     if filter_type == "date":
         debut, fin = spec.get("dateFrom"), spec.get("dateTo")
     else:
         debut, fin = spec.get("filter"), spec.get("filterTo")
     if type_ == "inRange":
-        return f"entre {_valeur(filter_type, debut)} et {_valeur(filter_type, fin)}"
-    return f"{operateur} {_valeur(filter_type, debut)}"
+        texte = f"entre {_valeur(filter_type, debut)} et {_valeur(filter_type, fin)}"
+        return texte, False, False
+    return f"{operateur} {_valeur(filter_type, debut)}", False, False
 
 
-def describe_filter(col: str, spec: dict) -> tuple[str, str]:
-    """(libellé de la colonne, expression du filtre) pour une entrée de filterModel."""
+def describe_filter(col: str, spec: dict, operateurs: bool) -> Description:
+    """Description d'une entrée de filterModel : libellé de la colonne,
+    expression appliquée, corrections éventuelles et opérateurs ignorés
+    (`operateurs` : l'utilisateur·ice est abonné·e)."""
     label = DATA_SCHEMA.get(col, {}).get("title", col)
-    conditions = spec.get("conditions")
-    if conditions:
-        jointure = _JOINTURES.get(spec.get("operator"), " et ")
-        return label, jointure.join(_condition(c) for c in conditions)
-    return label, _condition(spec)
+    conditions = spec.get("conditions") or [spec]
+    jointure = _JOINTURES.get(spec.get("operator"), " et ")
+    resultats = [_condition(c, operateurs) for c in conditions]
+    return Description(
+        label,
+        jointure.join(texte for texte, _, _ in resultats),
+        any(corrigee for _, corrigee, _ in resultats),
+        any(ignores for _, _, ignores in resultats),
+    )
 
 
-def filter_pills(filter_model: dict | None, context: str) -> list:
+def banniere_operateurs() -> html.Span:
+    """Bandeau signalant aux non-abonné·es que les opérateurs sont ignorés."""
+    return html.Span(
+        [
+            BANNIERE_OPERATEURS,
+            " ",
+            html.A("S'abonner", href="/projet/abonnement"),
+        ],
+        className="filter-pills-banniere",
+    )
+
+
+def filter_pills(filter_model: dict | None, context: str, operateurs: bool) -> list:
     """Une pastille par colonne filtrée, dans l'ordre du filterModel.
 
     Corps et croix sont deux boutons frères : un clic sur la croix ne compte
     pas comme un clic sur la pastille (pas de propagation vers un parent à id).
+    Pastille signalée si la saisie a été corrigée ; bandeau en fin de liste si
+    des opérateurs ont été ignorés (non abonné·e).
     """
     pills = []
+    ignores = False
     for col, spec in (filter_model or {}).items():
-        label, expression = describe_filter(col, spec)
+        desc = describe_filter(col, spec, operateurs)
+        ignores = ignores or desc.operateurs_ignores
         pills.append(
             html.Span(
                 [
                     html.Button(
-                        [html.Strong(label), " " + expression],
+                        [html.Strong(desc.label), " " + desc.expression],
                         id={"type": f"{context}-filter-pill", "col": col},
                         className="filter-pill-body",
                         title="Modifier ce filtre",
@@ -98,12 +152,16 @@ def filter_pills(filter_model: dict | None, context: str) -> list:
                         "×",
                         id={"type": f"{context}-filter-pill-remove", "col": col},
                         className="filter-pill-remove",
-                        title=f"Supprimer le filtre {label}",
+                        title=f"Supprimer le filtre {desc.label}",
                     ),
                 ],
-                className="filter-pill",
+                className="filter-pill filter-pill-warning"
+                if desc.corrigee
+                else "filter-pill",
             )
         )
+    if not operateurs and ignores:
+        pills.append(banniere_operateurs())
     return pills
 
 
@@ -155,7 +213,11 @@ def register_filter_pills_callbacks(
         Input(grid_id, "filterModel"),
     )
     def _render(filter_model):
-        return filter_pills(_premier(filter_model), context)
+        from src.pages._compte_shell import current_user_has_subscription
+
+        return filter_pills(
+            _premier(filter_model), context, current_user_has_subscription()
+        )
 
     sorties = [Output(grid_id, "filterModel", allow_duplicate=True)]
     if clear_active_view:

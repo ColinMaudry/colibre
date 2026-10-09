@@ -397,6 +397,22 @@ input[type="email"] {
 .filter-pill-remove:hover {
   color: #b33821;
 }
+/* Saisie corrigée avant application (#97) */
+.filter-pill-warning {
+  background: var(--bs-warning-bg-subtle);
+  color: var(--bs-warning-text-emphasis);
+  box-shadow: inset 0 0 0 1px var(--bs-warning-border-subtle);
+}
+/* Opérateurs ignorés : saisie d'un·e non-abonné·e (#97) */
+.filter-pills-banniere {
+  display: inline-block;
+  margin: 2px 0 2px 8px;
+  padding: 1px 10px;
+  border-radius: 4px;
+  background: var(--bs-warning-bg-subtle);
+  color: var(--bs-warning-text-emphasis);
+  box-shadow: inset 0 0 0 1px var(--bs-warning-border-subtle);
+}
 
 /* Légende des boutons en tête du mode d'emploi : boutons reproduits à
    l'identique mais inertes, alignés en face de leur fonction. */
@@ -1577,6 +1593,10 @@ input[type="number"] {
 [data-bs-theme="dark"] .filter-pill {
   background: #3a3f44;
   color: #dee2e6;
+}
+[data-bs-theme="dark"] .filter-pill-warning {
+  background: var(--bs-warning-bg-subtle);
+  color: var(--bs-warning-text-emphasis);
 }
 [data-bs-theme="dark"] .filter-pill-remove:hover {
   color: var(--earth-primary);
