@@ -96,6 +96,11 @@ def test_fiche_acheteur_pastille_et_suppression(dash_duo):
     dash_duo.wait_for_contains_text(
         "#acheteur-filter-pills", "contient test", timeout=10
     )
+    # Le re-rendu des pastilles déclenche le callback de suppression (n_clicks
+    # à None) : il ne doit pas échouer sur la sortie filterModel à motif ALL.
+    assert not [
+        log for log in dash_duo.get_logs() if "_dash-update-component" in log["message"]
+    ]
     dash_duo.find_element("#acheteur-filter-pills .filter-pill-remove").click()
 
     WebDriverWait(dash_duo.driver, 10).until(

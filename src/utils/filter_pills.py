@@ -16,6 +16,7 @@ from dash import (
     html,
     no_update,
 )
+from dash.exceptions import PreventUpdate
 
 from src.figures import DATA_SCHEMA
 from src.utils.table import format_number, get_default_hidden_columns
@@ -169,7 +170,10 @@ def register_filter_pills_callbacks(
     def _remove(_n_clicks, filter_model):
         col = col_cliquee(ctx.triggered_id, ctx.triggered[0]["value"])
         if col is None:
-            return [no_update] * len(sorties)
+            # Re-rendu des pastilles. PreventUpdate et non [no_update] : sur
+            # les fiches, la sortie filterModel est un motif ALL, qui exige
+            # une liste (Dash refuse un NoUpdate à sa place).
+            raise PreventUpdate
         if isinstance(filter_model, list):  # grilles des fiches (ALL)
             nouveau = [filter_model_sans(fm, col) for fm in filter_model]
         else:
