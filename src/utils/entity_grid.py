@@ -223,6 +223,9 @@ def register_entity_grid_callbacks(org_type: str) -> None:
         prevent_initial_call=True,
     )
     def _reset(_n, column_states):
+        from src.utils.suivi import emettre
+
+        emettre(org_type.capitalize(), "reinitialisation")
         cleared = [clear_sort(cs) for cs in (column_states or [])]
         return [{} for _ in cleared], cleared
 

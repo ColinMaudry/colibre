@@ -737,6 +737,8 @@ def download_data(n_clicks, filter_model, column_state, total=None):
     [State("tableau_help", "is_open")],
 )
 def toggle_tableau_help(click_open, click_close, is_open):
+    if ctx.triggered_id == "tableau_help_open":
+        emettre("Tableau", "mode_emploi")
     if click_open or click_close:
         return not is_open
     return is_open
@@ -841,6 +843,7 @@ def reset_view(n_clicks, column_state):
     cleared_sort = [
         {**col, "sort": None, "sortIndex": None} for col in (column_state or [])
     ]
+    emettre("Tableau", "reinitialisation")
     return {}, cleared_sort
 
 

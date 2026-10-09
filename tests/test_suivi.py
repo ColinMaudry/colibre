@@ -92,3 +92,75 @@ def test_recherche_accueil_emet_une_seule_recherche_avec_la_somme(monkeypatch):
         "accueil",
         attendu,
     )
+
+
+def _capturer_actions(monkeypatch):
+    envois = []
+    monkeypatch.setattr(
+        "src.utils.suivi.set_props",
+        lambda cid, p: envois.append((p["data"]["categorie"], p["data"]["action"])),
+    )
+    return envois
+
+
+def test_ouverture_du_mode_d_emploi_emet(monkeypatch):
+    from types import SimpleNamespace
+
+    import src.app  # noqa: F401
+    from src.pages import tableau
+
+    envois = _capturer_actions(monkeypatch)
+    monkeypatch.setattr(
+        tableau, "ctx", SimpleNamespace(triggered_id="tableau_help_open")
+    )
+    tableau.toggle_tableau_help(1, None, False)
+    assert envois == [("Tableau", "mode_emploi")]
+
+
+def test_fermeture_du_mode_d_emploi_n_emet_pas(monkeypatch):
+    from types import SimpleNamespace
+
+    import src.app  # noqa: F401
+    from src.pages import tableau
+
+    envois = _capturer_actions(monkeypatch)
+    monkeypatch.setattr(
+        tableau, "ctx", SimpleNamespace(triggered_id="tableau_help_close")
+    )
+    tableau.toggle_tableau_help(1, 1, True)
+    assert envois == []
+
+
+def test_reinitialisation_tableau_emet(monkeypatch):
+    import src.app  # noqa: F401
+    from src.pages import tableau
+
+    envois = _capturer_actions(monkeypatch)
+    tableau.reset_view(1, [])
+    assert envois == [("Tableau", "reinitialisation")]
+
+
+def _get_reset_callback(org_type):
+    import dash
+
+    from src.app import app
+
+    registres = list(dash._callback.GLOBAL_CALLBACK_MAP.values()) + list(
+        app.callback_map.values()
+    )
+    for entree in registres:
+        fn = entree.get("callback")
+        wrapped = getattr(fn, "__wrapped__", None)
+        if (
+            wrapped is not None
+            and wrapped.__name__ == "_reset"
+            and org_type in str(entree.get("output", ""))
+        ):
+            return wrapped
+    raise AssertionError(f"_reset introuvable pour {org_type}")
+
+
+def test_reinitialisation_fiche_emet(monkeypatch):
+    envois = _capturer_actions(monkeypatch)
+    _get_reset_callback("titulaire")(1, [])
+    assert envois == [("Titulaire", "reinitialisation")]
