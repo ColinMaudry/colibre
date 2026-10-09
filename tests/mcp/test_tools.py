@@ -62,6 +62,6 @@ def test_rechercher_marches_page_size_passthrough():
 
 
 def test_rechercher_marches_page_size_out_of_bounds_returns_error():
-    result = tools.rechercher_marches(acheteur_id="123", page_size=1001)
+    result = tools.rechercher_marches(acheteur_id="123", page_size=201)
     assert "error" in result
     assert result["champ"] == "page_size"

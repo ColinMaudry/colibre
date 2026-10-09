@@ -20,7 +20,7 @@ bp = Blueprint(
     description="API privée colibre — accès tabulaire aux marchés publics.",
 )
 
-MAX_PAGE_SIZE = 1000
+MAX_PAGE_SIZE = 200
 
 
 def _parse_pagination():
@@ -132,8 +132,8 @@ def schema():
         {
             "name": "page_size",
             "in": "query",
-            "schema": {"type": "integer", "default": 50, "minimum": 1, "maximum": 1000},
-            "description": "Nombre de résultats par page (max 1000).",
+            "schema": {"type": "integer", "default": 50, "minimum": 1, "maximum": 200},
+            "description": "Nombre de résultats par page (max 200).",
         },
         {
             "name": "columns",
@@ -225,7 +225,7 @@ def data():
     `meta` ne contient alors pas `total`. `sort` est supporté sur les colonnes
     `groupby` ; non supporté sur les alias d'agrégats (→ 400).
 
-    Paramètres réservés : page (défaut 1), page_size (défaut 50, max 1000),
+    Paramètres réservés : page (défaut 1), page_size (défaut 50, max 200),
     columns (csv), count_results (true|false ; mettre false pour économiser
     le COUNT(*)).
 

@@ -12,7 +12,7 @@ from src.utils.search import search_org
 
 PAGE_SIZE = 50
 # Même borne que l'API REST (src/api/routes.py.MAX_PAGE_SIZE).
-MAX_PAGE_SIZE = 1000
+MAX_PAGE_SIZE = 200
 TOP_N = 10
 ORG_FRAMES = {"acheteur": DF_ACHETEURS, "titulaire": DF_TITULAIRES}
 

@@ -227,7 +227,7 @@ def test_search_marches_page_size_controls_limit_and_offset(monkeypatch):
 
 
 def test_search_marches_page_size_out_of_bounds_returns_error():
-    for bad in (0, -1, 1001):
+    for bad in (0, -1, 201):
         result = search_marches(acheteur_id="123", page_size=bad)
         assert "error" in result
         assert result["champ"] == "page_size"

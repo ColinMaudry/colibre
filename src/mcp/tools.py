@@ -97,8 +97,8 @@ def rechercher_marches(
     Chaque marché renvoyé contient en plus un champ `lien` (URL de la fiche
     marché sur colibre).
     page : numéro de page.
-    page_size : nombre de résultats par page (défaut 50, max 1000 ;
-    erreur si hors [1, 1000]).
+    page_size : nombre de résultats par page (défaut 50, max 200 ;
+    erreur si hors [1, 200]).
     Retourne {meta: {page, page_size, total}, marches: [...]}.
     """
     track_mcp_tool("rechercher_marches", query=objet_contient)
