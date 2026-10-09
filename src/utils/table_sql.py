@@ -1,10 +1,14 @@
-import unicodedata
 from datetime import datetime, timedelta
 
 import polars as pl
 from unidecode import unidecode
 
 from src.utils import logger
+from src.utils.text_normalization import (
+    NORMALIZED_COLUMNS,
+    normalized_target,
+    normalized_term,
+)
 
 
 def sort_by_to_sql(sort_by: list[dict] | None, schema: pl.Schema) -> str:
@@ -148,43 +152,18 @@ def dashboard_filters_to_sql(
 # la saisie utilisateur est désaccentuée pour matcher, comme sur /recherche.
 _ACCENT_INSENSITIVE_COLUMNS = {"acheteur_nom", "titulaire_nom"}
 
-# Colonnes qui contiennent de vrais accents et ligatures (#147) : la colonne ET
-# la saisie sont normalisées (accents retirés, œ → oe, æ → ae) avant la
-# comparaison, pour que « maitrise d'oeuvre » retrouve « Maîtrise d'œuvre ».
-_ACCENT_NORMALIZED_COLUMNS = {"objet"}
-
-_LIGATURES = {"œ": "oe", "Œ": "OE", "æ": "ae", "Æ": "AE"}
-
-
-def _strip_accents_sql(expr: str) -> str:
-    """Expression DuckDB équivalente à `_strip_accents` appliquée à `expr`."""
-    sql = f"strip_accents({expr})"
-    for ligature, replacement in _LIGATURES.items():
-        sql = f"replace({sql}, '{ligature}', '{replacement}')"
-    return sql
-
-
-def _strip_accents(text: str) -> str:
-    """Équivalent Python de `_strip_accents_sql`, pour que saisie et colonne
-    soient normalisées de la même façon (ex. « ’ » reste « ’ » des deux côtés)."""
-    decomposed = unicodedata.normalize("NFD", text)
-    stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
-    for ligature, replacement in _LIGATURES.items():
-        stripped = stripped.replace(ligature, replacement)
-    return stripped
-
 
 def text_filter_target(column: str, quoted_col: str) -> str:
-    """Expression SQL de la colonne, à comparer avec `normalize_text_term`."""
-    if column in _ACCENT_NORMALIZED_COLUMNS:
-        return _strip_accents_sql(quoted_col)
-    return quoted_col
+    """Colonne à comparer à la saisie renvoyée par `normalize_text_term` : la
+    colonne précalculée pour les colonnes de `NORMALIZED_COLUMNS` (#147), sinon
+    la colonne elle-même."""
+    return normalized_target(column, quoted_col)
 
 
 def normalize_text_term(column: str, term: str) -> str:
     """Saisie normalisée selon la colonne filtrée (cf. `text_filter_target`)."""
-    if column in _ACCENT_NORMALIZED_COLUMNS:
-        return _strip_accents(term)
+    if column in NORMALIZED_COLUMNS:
+        return normalized_term(column, term)
     if column in _ACCENT_INSENSITIVE_COLUMNS:
         return unidecode(term)
     return term

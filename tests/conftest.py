@@ -129,3 +129,44 @@ def pytest_setup_options():
     # interactifs pour Selenium.
     options.add_argument("--window-size=1600,1200")
     return options
+
+
+# Cinq graphies de « Maîtrise d'œuvre » (#147), dont une avec l'apostrophe
+# typographique, qui est celle de la quasi-totalité des données de production.
+OBJETS_MAITRISE = [
+    "Maîtrise d'œuvre",
+    "maitrise d'œuvre",
+    "maîtrise d'oeuvre",
+    "MAÎTRISE D'ŒUVRE",
+    "Maîtrise d’œuvre",
+]
+
+
+@pytest.fixture
+def objets_maitrise():
+    """Les cinq graphies, triées comme le renvoient les tests de filtre."""
+    return sorted(OBJETS_MAITRISE)
+
+
+@pytest.fixture
+def con_objets():
+    """DuckDB en mémoire avec la table `decp` des tests de filtre sur `objet` :
+    les cinq graphies, deux objets sans rapport, un NULL et une chaîne vide.
+    `objet_normalise` est calculée comme au build (`normalize_text_sql`)."""
+    import duckdb
+
+    from src.utils.text_normalization import normalize_text_sql
+
+    con = duckdb.connect(":memory:")
+    con.execute(
+        "CREATE TABLE decp (objet VARCHAR, objet_normalise VARCHAR, "
+        'acheteur_nom VARCHAR, titulaire_nom VARCHAR, "dateNotification" DATE)'
+    )
+    objets = [*OBJETS_MAITRISE, "Travaux de voirie", "Éclairage public", None, ""]
+    con.executemany(
+        'INSERT INTO decp (objet, acheteur_nom, titulaire_nom, "dateNotification") '
+        "VALUES (?, 'NIMES METROPOLE', 'FREJUS SARL', DATE '2025-06-01')",
+        [(objet,) for objet in objets],
+    )
+    con.execute(f"UPDATE decp SET objet_normalise = {normalize_text_sql('objet')}")
+    return con
