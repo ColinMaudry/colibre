@@ -14,7 +14,6 @@ from src.utils import logger
 from src.utils.cache import cache
 from src.utils.data import DATA_SCHEMA
 from src.utils.frontend import get_button_properties
-from src.utils.tracking import track_search
 
 
 def split_filter_part(filter_part):
@@ -555,9 +554,6 @@ def prepare_table_data(
     :return:
     """
     logger.debug(" + + + + + + + + + + + + + + + + + + ")
-
-    if filter_query:
-        track_search(filter_query, source_table)
 
     trigger_cleanup = no_update if source_table == "tableau" else str(uuid.uuid4())
 

@@ -59,7 +59,6 @@ from src.utils.table import (
     write_styled_excel,
 )
 from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
-from src.utils.tracking import track_search
 
 # L'URL de l'API data.gouv.fr redirige toujours vers la dernière version
 # publiée du CSV complet des DECP (mise à jour quotidienne) : pas besoin de
@@ -105,9 +104,15 @@ register_page(
 # maison (store tableau-hidden-columns → régénération des columnDefs → événement
 # columnVisible de source 'gridOptionsChanged', identique pour l'utilisateur et
 # l'application programmatique) : indistinguable via AG Grid, donc non écoutée.
+#
+# filterChanged alimente aussi le suivi Matomo des filtres (issue #149), avec
+# les mêmes sources programmatiques ignorées.
 _SHARE_DRIFT_LISTENERS = {
-    event: ["hideShareOnUserAction(params)"]
-    for event in ("filterChanged", "sortChanged")
+    "filterChanged": [
+        "hideShareOnUserAction(params)",
+        "suivreFiltres(params, 'Tableau')",
+    ],
+    "sortChanged": ["hideShareOnUserAction(params)"],
 }
 
 DATATABLE = html.Div(
@@ -634,12 +639,6 @@ def get_rows_tableau(request):
         return no_update, no_update, no_update
     filter_model = request.get("filterModel") or None
     sort_model = request.get("sortModel") or None
-    # AG Grid renvoie une nouvelle requête getRowsRequest pour chaque bloc de
-    # défilement infini, avec le même filterModel tant que le filtre ne change
-    # pas. Ne compter qu'une recherche par changement de filtre/tri (bloc 0),
-    # pas une par bloc chargé au défilement.
-    if filter_model and request.get("startRow", 0) == 0:
-        track_search(json.dumps(filter_model), "tableau")
     rows, total, total_unique = fetch_grid_page(
         filter_model,
         sort_model,
@@ -1198,7 +1197,6 @@ def update_mode_observatoire_cards(mode_actif, filter_model, card_order):
             MODE_OBSERVATOIRE_CLASSES,
         )
 
-    track_search(json.dumps(filter_model), "tab observatoire")
     cards = _cards_pour_filtre(_normalize_filter_model(filter_model), current_theme())
 
     # Après le cache mémoïsé de _cards_pour_filtre, jamais dedans : l'ordre

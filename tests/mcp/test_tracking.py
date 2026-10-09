@@ -88,33 +88,3 @@ def test_track_mcp_tool_n_exceptionne_pas(monkeypatch):
     monkeypatch.setattr(tracking, "post", fake_post)
 
     tracking.track_mcp_tool("stats_acheteur")  # ne lève pas
-
-
-def test_track_search_ignore_les_requetes_courtes(monkeypatch):
-    called = False
-
-    def fake_post(url, data, timeout=None):
-        nonlocal called
-        called = True
-
-    _activer(monkeypatch)
-    monkeypatch.setattr(tracking, "post", fake_post)
-
-    tracking.track_search("abc", "home_page_search")
-
-    assert called is False
-
-
-def test_track_search_envoie_la_requete(monkeypatch):
-    captured = {}
-
-    _activer(monkeypatch)
-    monkeypatch.setattr(
-        tracking, "post", lambda url, data, timeout=None: captured.update(data)
-    )
-
-    tracking.track_search("informatique", "home_page_search")
-
-    assert captured["search"] == "informatique"
-    assert captured["action_name"] == "search"
-    assert captured["search_cat"] == "home_page_search"

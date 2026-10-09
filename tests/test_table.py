@@ -32,18 +32,6 @@ def test_table_module_imports():
     assert hasattr(table, "prepare_table_data")
 
 
-def test_filter_table_data_does_not_call_track_search(monkeypatch, sample_lff):
-    from src.utils import table
-
-    calls = []
-    monkeypatch.setattr(table, "track_search", lambda *a, **kw: calls.append(a))
-
-    result = table.filter_table_data(sample_lff, "{objet} icontains travaux").collect()
-
-    assert calls == []
-    assert result.height == 1
-
-
 def test_filter_table_data_accent_insensitive():
     """Chercher sans accent doit trouver des valeurs accentuées, et vice versa."""
     from src.utils.table import filter_table_data
@@ -155,26 +143,6 @@ def test_prepare_table_data_returns_expected_tuple(flask_app):
     assert isinstance(dicts, list)
     assert ts == 6  # data_timestamp + 1 must still increment
     assert "lignes" in nb_rows
-
-
-def test_prepare_table_data_calls_track_search_on_filter(monkeypatch, flask_app):
-    from src.utils import table
-
-    calls = []
-    monkeypatch.setattr(table, "track_search", lambda *a, **kw: calls.append(a))
-
-    with flask_app.app_context():
-        table.prepare_table_data(
-            data=None,
-            data_timestamp=0,
-            filter_query="{objet} icontains travaux",
-            page_current=0,
-            page_size=20,
-            sort_by=[],
-            source_table="tableau",
-        )
-
-    assert calls == [("{objet} icontains travaux", "tableau")]
 
 
 def test_prepare_table_data_same_page_uses_cache(monkeypatch, flask_app):
