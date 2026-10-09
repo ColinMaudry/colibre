@@ -169,6 +169,12 @@ composants de `FILTER_PARAMS` (`src/pages/observatoire.py:431`) : ni au
 chargement initial (aucun déclencheur), ni sur un changement d'ordre des
 tuiles (`observatoire-card-order`). Jeu vide non envoyé.
 
+Le dict sérialisé a pour clés les `url_key` de `FILTER_PARAMS` (noms des
+paramètres d'URL partageables, par exemple `objet`, `acheteur_dept`, `annee`).
+Les filtres dont la valeur égale leur défaut dans `FILTER_PARAMS` (4ᵉ élément
+du tuple, par exemple `"all"` pour `innovant` et `sous_traitance`) sont écartés
+avant sérialisation : un état entièrement par défaut n'envoie rien.
+
 Limite assumée : un lien partagé appliqué par `restore_filters`
 (`src/pages/observatoire.py:459`) modifie les mêmes composants et sera compté
 comme une application de filtres.
@@ -220,8 +226,9 @@ logique :
   `lessThanOrEqual` → `≤`, `greaterThan` → `>`, `greaterThanOrEqual` → `≥`,
   `inRange` → `entre … et …`, `blank` → `vide`, `notBlank` → `non vide` ;
   type inconnu : identifiant AG Grid tel quel ;
-- observatoire : valeurs vides (`None`, `""`, `[]`) ignorées ; listes en
-  ensembles, booléens tels quels ;
+- observatoire : colonnes = `url_key` ; valeurs vides (`None`, `""`, `[]`) et
+  valeurs égales à leur défaut ignorées ; listes en ensembles, booléens tels
+  quels ;
 - chaîne tronquée à 500 caractères, terminée par `…`.
 
 Même jeu de filtres → même chaîne → une seule ligne dans les rapports Matomo.
