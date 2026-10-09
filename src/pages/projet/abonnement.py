@@ -18,6 +18,7 @@ register_page(
 
 abonnement_features = dcc.Markdown("""
     - sauvegardez et partagez des **vues** (ensemble de filtres, de tris et de colonnes) dans la page Tableau
+    - combinez vos filtres texte avec **OU**, **ET**, **PAS** et des parenthèses (Tableau, fiches, Observatoire)
     - interrogez les données depuis un agent IA via le **connecteur MCP** (ChatGPT, Claude, Mistral...)
     - personnalisez l'ordre d'affichage des tuiles de l'**Observatoire**
     - projetez les données filtrées de la page Tableau dans les visualisations de l'Observatoire

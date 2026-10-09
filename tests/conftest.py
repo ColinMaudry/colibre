@@ -142,6 +142,37 @@ def pytest_setup_options():
     return options
 
 
+@pytest.fixture
+def compte_abonne(monkeypatch):
+    """Un compte vérifié, abonné via `TOUS_ABONNES` (comme en production pendant
+    la période d'accès gratuit), sans passer par la base d'abonnements."""
+    from werkzeug.security import generate_password_hash
+
+    from src.auth import db as auth_db
+    from tests._selenium_compte import EMAIL, MOT_DE_PASSE
+
+    monkeypatch.setattr("src.utils.TOUS_ABONNES", True)
+
+    row = auth_db.get_user_by_email(EMAIL)
+    if row is None:
+        user_id = auth_db.create_user(EMAIL, generate_password_hash(MOT_DE_PASSE))
+    else:
+        user_id = row["id"]
+        auth_db.update_password_hash(user_id, generate_password_hash(MOT_DE_PASSE))
+    auth_db.set_email_verified(user_id)
+    return user_id
+
+
+@pytest.fixture
+def compte_sans_abonnement(monkeypatch, compte_abonne):
+    """Le même compte vérifié et connecté, mais sans accès d'abonné : c'est
+    bien TOUS_ABONNES (ou un abonnement) qui ouvre les fonctionnalités, pas le
+    simple fait d'avoir un compte."""
+    monkeypatch.setattr("src.utils.TOUS_ABONNES", False)
+    monkeypatch.setattr("src.subscriptions.db.has_access", lambda _uid: False)
+    return compte_abonne
+
+
 # Cinq graphies de « Maîtrise d'œuvre » (#147), dont une avec l'apostrophe
 # typographique, qui est celle de la quasi-totalité des données de production.
 OBJETS_MAITRISE = [

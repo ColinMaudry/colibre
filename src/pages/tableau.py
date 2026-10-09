@@ -334,6 +334,24 @@ def _layout(a_un_abonnement: bool) -> list:
 
                 Vous pouvez filtrer plusieurs colonnes à la fois ; les filtres de colonnes différentes se cumulent toujours (ET).
 
+                ##### Syntaxe des champs texte
+
+                Dans les conditions « contient » et « ne contient pas », dans le champ sous l'en-tête comme dans le filtre complet :
+
+                - plusieurs mots séparés par des espaces doivent tous être présents ;
+                - `"maintenance sur site"` cherche ces mots groupés, dans cet ordre ;
+                - `béton*` cherche un texte qui commence par « béton », `*béton` un texte qui finit par « béton ».
+
+                Abonné·es : combinez vos critères avec **OU**, **ET**, **PAS** (en majuscules) et des parenthèses :
+
+                - `amo OU assistance`
+                - `(béton OU ciment) ET brique`
+                - `travaux ET PAS construction`
+                - `conseil ET PAS "étude de marché"`
+                - `"Clause sociale" ET "Critère social"`
+
+                La pastille au-dessus du tableau montre le filtre réellement appliqué. Si une expression est incomplète (parenthèse ou guillemet manquant, opérateur sans mot), elle est corrigée et la pastille, en jaune, indique la correction.
+
                 ##### Trier les données
 
                 Cliquez sur l'en-tête d'une colonne pour la trier. Chaque clic change le tri dans cet ordre :

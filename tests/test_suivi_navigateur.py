@@ -7,12 +7,9 @@ from dash.testing.composite import DashComposite
 from selenium.webdriver import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
+from tests._selenium_compte import ouvrir_le_tableau as _ouvrir_le_tableau
+from tests._selenium_compte import se_connecter as _se_connecter
 from tests.helpers import appels_paq, installer_espion_paq
-from tests.test_tableau_mode_observatoire_abonne import (  # noqa: F401
-    _ouvrir_le_tableau,
-    _se_connecter,
-    compte_abonne,
-)
 
 # Anti-rebond de 3 s des filtres de grille, plus une marge.
 _ATTENTE_ANTI_REBOND = 4
