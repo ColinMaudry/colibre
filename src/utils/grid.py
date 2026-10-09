@@ -16,7 +16,7 @@ def _cached_count(where_sql: str, params: tuple) -> int:
     AG Grid envoie une requête par bloc de défilement infini ; pour un même
     filtre, tous les blocs partagent le même (where_sql, params) et donc le
     même total — inutile de recompter un COUNT(*) sur ~1,5M lignes à chaque
-    bloc chargé (cf. `src.utils.table._fetch_page_sql`, même schéma).
+    bloc chargé.
     """
     return count_marches(where_sql, params)
 
@@ -58,9 +58,8 @@ def fetch_grid_page(
     rows = page.to_dicts()
     # Numéro de ligne absolu (position dans les résultats filtrés/triés),
     # ajouté sous le lien loupe : repère visuel pendant le défilement infini
-    # de la grille. Calculé ici (pas dans postprocess_page, partagé avec les
-    # dash_table paginées d'acheteur.py/titulaire.py) car il dépend de
-    # `start_row`, propre au chargement par bloc de l'AG Grid.
+    # de la grille. Calculé ici plutôt que dans postprocess_page car il dépend
+    # de `start_row`, propre au chargement par bloc de l'AG Grid.
     for i, row in enumerate(rows):
         row["marche"] = (
             f'{row["marche"]}<div class="marche-row-number">{start_row + i + 1}</div>'

@@ -11,7 +11,12 @@ from dataclasses import dataclass
 import polars as pl
 
 from src.utils import logger
-from src.utils.table_sql import sort_by_to_sql, tokenize_text_filter
+from src.utils.table_sql import (
+    normalize_text_term,
+    sort_by_to_sql,
+    text_filter_target,
+    tokenize_text_filter,
+)
 
 
 @dataclass
@@ -116,9 +121,11 @@ def _condition_to_sql(cond: Condition, schema: pl.Schema) -> tuple[str, list]:
             str(cond.value2),
         ]
     if cond.operator == "startsWith":
-        return f"{quoted} ILIKE ?", [f"{cond.value}%"]
+        value = normalize_text_term(col, str(cond.value))
+        return f"{text_filter_target(col, quoted)} ILIKE ?", [f"{value}%"]
     if cond.operator == "endsWith":
-        return f"{quoted} ILIKE ?", [f"%{cond.value}"]
+        value = normalize_text_term(col, str(cond.value))
+        return f"{text_filter_target(col, quoted)} ILIKE ?", [f"%{value}"]
     logger.warning(f"Opérateur texte invalide : {cond.operator!r}")
     return "TRUE", []
 

@@ -10,7 +10,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import polars as pl
-from dash import MATCH, Input, State, clientside_callback, dash_table, dcc, html
+from dash import MATCH, Input, State, clientside_callback, dcc, html
 from dash_extensions.javascript import Namespace
 
 from src.db import schema
@@ -256,102 +256,6 @@ def get_sources_tables(source_path) -> html.Div:
             defaultColDef={"valueFormatter": {"function": "params.value ?? 'N/A'"}},
         )
     )
-
-
-class DataTable(dash_table.DataTable):
-    def __init__(
-        self,
-        dtid: str,
-        hidden_columns: list[str] | None = None,
-        data: list[dict[str, str | int | float | bool]] | None = None,
-        columns: list[dict[str, str]] | None = None,
-        page_size: int = 20,
-        page_action: Literal["native", "custom", "none"] = "native",
-        sort_action: Literal["native", "custom", "none"] = "native",
-        filter_action: Literal["native", "custom", "none"] = "native",
-        style_cell_conditional: list | None = None,
-        style_cell: dict | None = None,
-        **kwargs,
-    ):
-        # Styles de base
-        style_cell_conditional_common = [
-            {
-                "if": {"column_id": "objet"},
-                "minWidth": "350px",
-                "overflow": "hidden",
-                "lineHeight": "18px",
-                "whiteSpace": "normal",
-            },
-            {
-                "if": {"column_id": "acheteur_id"},
-                "minWidth": "160px",
-                "overflow": "hidden",
-                "whiteSpace": "normal",
-            },
-            {
-                "if": {"column_id": "acheteur_nom"},
-                "minWidth": "250px",
-                "overflow": "hidden",
-                "lineHeight": "18px",
-                "whiteSpace": "normal",
-            },
-            {
-                "if": {"column_id": "titulaire_nom"},
-                "minWidth": "250px",
-                "overflow": "hidden",
-                "lineHeight": "18px",
-                "whiteSpace": "normal",
-            },
-        ]
-
-        style_cell_common = {"fontFamily": "Inter", "fontSize": "16px"}
-
-        for key in DATA_SCHEMA.keys():
-            field = DATA_SCHEMA[key]
-            if field["type"] in ["number", "integer"]:
-                rule = {
-                    "if": {"column_id": field["name"]},
-                    "textAlign": "right",
-                    # "fontFamily": "Fira Code",
-                }
-                style_cell_conditional_common.append(rule)
-
-        style_cell_conditional = (
-            style_cell_conditional or []
-        ) + style_cell_conditional_common
-        if style_cell:
-            style_cell.update(style_cell_common)
-        else:
-            style_cell = style_cell_common
-        style_header = style_cell
-
-        # Initialisation de la classe parente avec les arguments
-        super().__init__(
-            id=dtid,
-            data=data,
-            columns=columns,
-            cell_selectable=False,
-            page_size=page_size,
-            filter_action=filter_action,
-            page_action=page_action,
-            filter_options={
-                "case": "insensitive",
-                "placeholder_text": "Filtre de colonne...",
-            },
-            sort_action=sort_action,
-            sort_mode="multi",
-            row_deletable=False,
-            page_current=0,
-            style_cell_conditional=style_cell_conditional,
-            data_timestamp=0,
-            markdown_options={"html": True},
-            style_header=style_header,
-            style_cell=style_cell,
-            tooltip_duration=8000,
-            tooltip_delay=350,
-            hidden_columns=hidden_columns,
-            **kwargs,  # Possibilité de remplacer des arguments
-        )
 
 
 def get_duplicate_matrix(theme: str | None = None) -> dcc.Graph:
@@ -1278,7 +1182,7 @@ def make_schema_grid():
 
 
 # Thème AG Grid commun à toutes les grilles du site (en-tête rouge brique,
-# lignes alternées, police Inter), aligné sur les dash_table.DataTable.
+# lignes alternées, police Inter).
 AG_GRID_THEME = {
     "function": (
         "themeQuartz.withParams({"
@@ -1379,9 +1283,8 @@ def ag_grid(
 ) -> "dag.AgGrid":
     """Grille AG Grid server-side (infinite) pour la page Tableau.
 
-    Thème aligné sur les dash_table.DataTable du reste du site (en-tête
-    rouge brique, lignes alternées, police Inter) ; libellés de filtre
-    traduits en français via localeText.
+    Thème commun du site (en-tête rouge brique, lignes alternées, police
+    Inter) ; libellés de filtre traduits en français via localeText.
     """
     return dag.AgGrid(
         id=grid_id,

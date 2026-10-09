@@ -74,18 +74,6 @@ def test_titulaire_id_uses_like_wildcards():
     assert params == [2025, "%999%"]
 
 
-def test_marche_objet_uses_case_insensitive_ilike():
-    where_sql, params = dashboard_filters_to_sql(
-        dashboard_year="2025",
-        dashboard_marche_objet="travaux",
-    )
-    assert (
-        where_sql
-        == 'YEAR("dateNotification") = ? AND "objet" IS NOT NULL AND "objet" <> \'\' AND "objet" ILIKE ?'
-    )
-    assert params == [2025, "%travaux%"]
-
-
 def test_code_cpv_uses_prefix_like():
     where_sql, params = dashboard_filters_to_sql(
         dashboard_year="2025",

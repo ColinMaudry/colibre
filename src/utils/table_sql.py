@@ -1,91 +1,14 @@
+import unicodedata
 from datetime import datetime, timedelta
 
 import polars as pl
 from unidecode import unidecode
 
 from src.utils import logger
-from src.utils.table import split_filter_part
-
-
-def filter_query_to_sql(filter_query: str, schema: pl.Schema) -> tuple[str, list]:
-    """Traduit le DSL de filtres de dash_table.DataTable en fragment SQL DuckDB.
-
-    Retourne (where_clause, params) où where_clause est un fragment à injecter
-    après WHERE et params est la liste des valeurs à passer à
-    cursor.execute(sql, params). Les identifiants de colonnes sont validés
-    contre le schéma fourni ; jamais concaténés avec des valeurs utilisateur.
-    """
-    if not filter_query:
-        return "TRUE", []
-
-    clauses: list[str] = []
-    params: list = []
-
-    for part in filter_query.split(" && "):
-        col_name, operator, raw_value = split_filter_part(part)
-        if not isinstance(col_name, str) or not isinstance(raw_value, str):
-            continue
-
-        if col_name not in schema.names():
-            logger.warning(f"Colonne inconnue ignorée : {col_name!r}")
-            continue
-
-        col_type = schema[col_name]
-        is_numeric = col_type.is_numeric()
-        col_is_date = col_type == pl.Date
-        quoted_col = f'"{col_name}"'
-
-        if is_numeric:
-            try:
-                value = int(raw_value) if col_type.is_integer() else float(raw_value)
-            except ValueError:
-                logger.warning(f"Valeur numérique invalide ignorée : {raw_value!r}")
-                continue
-
-            if operator == "contains":
-                clauses.append(f"{quoted_col} IS NOT NULL AND {quoted_col} = ?")
-            elif operator == ">":
-                clauses.append(f"{quoted_col} IS NOT NULL AND {quoted_col} > ?")
-            elif operator == "<":
-                clauses.append(f"{quoted_col} IS NOT NULL AND {quoted_col} < ?")
-            else:
-                logger.warning(f"Opérateur invalide pour numérique : {operator!r}")
-                continue
-            params.append(value)
-            continue
-
-        # String / Date : toujours traité comme texte (parité avec Polars)
-        value = raw_value.strip('"')
-
-        if operator == "contains":
-            if col_is_date:
-                target = f"CAST({quoted_col} AS VARCHAR)"
-
-            if col_name in ("acheteur_id", "titulaire_id"):
-                value = value.replace(" ", "")
-            where_clause, param_list = tokenize_text_filter(
-                col_name, value, col_is_date
-            )
-            clauses.append(where_clause)
-            params.extend(param_list)
-            logger.debug(params)
-            continue
-
-        elif operator in (">", "<"):
-            target = f"CAST({quoted_col} AS VARCHAR)" if col_is_date else quoted_col
-            clauses.append(f"{quoted_col} IS NOT NULL AND {target} {operator} ?")
-            params.append(value)
-        else:
-            logger.warning(f"Opérateur invalide pour chaîne : {operator!r}")
-            continue
-
-    if not clauses:
-        return "TRUE", []
-    return " AND ".join(clauses), params
 
 
 def sort_by_to_sql(sort_by: list[dict] | None, schema: pl.Schema) -> str:
-    """Traduit sort_by (format Dash) en clause ORDER BY DuckDB.
+    """Traduit une liste de {column_id, direction} en clause ORDER BY DuckDB.
 
     Retourne '' si pas de tri (aucun ORDER BY à ajouter).
     """
@@ -221,11 +144,50 @@ def dashboard_filters_to_sql(
     return " AND ".join(clauses), params
 
 
-# Colonnes dont les valeurs sont déjà stockées sans accents (cf. #138) : la
-# saisie utilisateur est désaccentuée pour matcher, comme sur /recherche.
-# Les autres colonnes texte (ex. "objet") contiennent de vrais accents et ne
-# doivent pas être désaccentuées, ni côté colonne ni côté saisie.
+# Colonnes dont les valeurs sont déjà stockées sans accents (cf. #138) : seule
+# la saisie utilisateur est désaccentuée pour matcher, comme sur /recherche.
 _ACCENT_INSENSITIVE_COLUMNS = {"acheteur_nom", "titulaire_nom"}
+
+# Colonnes qui contiennent de vrais accents et ligatures (#147) : la colonne ET
+# la saisie sont normalisées (accents retirés, œ → oe, æ → ae) avant la
+# comparaison, pour que « maitrise d'oeuvre » retrouve « Maîtrise d'œuvre ».
+_ACCENT_NORMALIZED_COLUMNS = {"objet"}
+
+_LIGATURES = {"œ": "oe", "Œ": "OE", "æ": "ae", "Æ": "AE"}
+
+
+def _strip_accents_sql(expr: str) -> str:
+    """Expression DuckDB équivalente à `_strip_accents` appliquée à `expr`."""
+    sql = f"strip_accents({expr})"
+    for ligature, replacement in _LIGATURES.items():
+        sql = f"replace({sql}, '{ligature}', '{replacement}')"
+    return sql
+
+
+def _strip_accents(text: str) -> str:
+    """Équivalent Python de `_strip_accents_sql`, pour que saisie et colonne
+    soient normalisées de la même façon (ex. « ’ » reste « ’ » des deux côtés)."""
+    decomposed = unicodedata.normalize("NFD", text)
+    stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
+    for ligature, replacement in _LIGATURES.items():
+        stripped = stripped.replace(ligature, replacement)
+    return stripped
+
+
+def text_filter_target(column: str, quoted_col: str) -> str:
+    """Expression SQL de la colonne, à comparer avec `normalize_text_term`."""
+    if column in _ACCENT_NORMALIZED_COLUMNS:
+        return _strip_accents_sql(quoted_col)
+    return quoted_col
+
+
+def normalize_text_term(column: str, term: str) -> str:
+    """Saisie normalisée selon la colonne filtrée (cf. `text_filter_target`)."""
+    if column in _ACCENT_NORMALIZED_COLUMNS:
+        return _strip_accents(term)
+    if column in _ACCENT_INSENSITIVE_COLUMNS:
+        return unidecode(term)
+    return term
 
 
 def tokenize_text_filter(
@@ -239,14 +201,13 @@ def tokenize_text_filter(
         quoted_col = f'"{column}"'
 
     conditions = [f'"{column}" IS NOT NULL', f"{quoted_col} <> ''"]
+    target = text_filter_target(column, quoted_col)
 
     params = []
-    strip_query_accents = column in _ACCENT_INSENSITIVE_COLUMNS
 
     for term in terms:
-        if strip_query_accents:
-            term = unidecode(term)
-        conditions.append(f"{quoted_col} ILIKE ?")
+        term = normalize_text_term(column, term)
+        conditions.append(f"{target} ILIKE ?")
 
         if term.startswith("*") or term.endswith("*"):
             params.append(term.replace("*", "%"))
