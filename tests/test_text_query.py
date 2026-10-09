@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from src.utils.text_query import analyser, en_texte, libelle_corrections
+from src.utils.text_query import analyser, en_sql, en_texte, libelle_corrections
 
 
 @pytest.mark.parametrize(
@@ -99,3 +99,156 @@ def test_nettoyage_lineaire():
 def test_phrase_litterale():
     expr = analyser('"maintenance   sur" )', True)
     assert en_texte(expr) == '"maintenance   sur"'
+
+
+def _filtre(
+    con, saisie, operateurs=True, colonne="objet", col_is_date=False, negation=False
+):
+    where, params = en_sql(analyser(saisie, operateurs), colonne, col_is_date)
+    if negation:
+        where = f"NOT ({where})"
+    rows = con.execute(f"SELECT objet FROM decp WHERE {where}", params).fetchall()
+    return sorted((r[0] for r in rows), key=lambda v: (v is None, v or ""))
+
+
+_NON_VIDES = sorted(
+    [
+        "Travaux de béton",
+        "Béton et ciment",
+        "Béton ou ciment au choix",
+        "Fourniture de ciment",
+        "Brique et béton",
+        "Ciment et brique",
+        "Entretien des espaces verts",
+        "Travaux de construction",
+        "Travaux de voirie",
+        "Conseil en étude de marché",
+        "Conseil juridique",
+        "Maintenance sur site",
+        "Site de maintenance",
+        "Maîtrise d’œuvre",
+        "Réseau OUEST",
+        "Prix 3+4",
+        "x' OR 1=1 --",
+    ]
+)
+
+_BETON_OU_CIMENT = sorted(
+    [
+        "Béton et ciment",
+        "Béton ou ciment au choix",
+        "Brique et béton",
+        "Ciment et brique",
+        "Fourniture de ciment",
+        "Travaux de béton",
+    ]
+)
+
+
+def test_ou(con_booleens):
+    assert _filtre(con_booleens, "béton OU ciment") == _BETON_OU_CIMENT
+
+
+def test_groupage(con_booleens):
+    assert _filtre(con_booleens, "(béton OU ciment) ET brique") == sorted(
+        ["Brique et béton", "Ciment et brique"]
+    )
+
+
+def test_priorite_et_sur_ou(con_booleens):
+    assert _filtre(con_booleens, "béton ciment OU brique") == sorted(
+        [
+            "Brique et béton",
+            "Béton et ciment",
+            "Béton ou ciment au choix",
+            "Ciment et brique",
+        ]
+    )
+
+
+def test_et_pas(con_booleens):
+    assert _filtre(con_booleens, "travaux ET PAS construction") == sorted(
+        ["Travaux de béton", "Travaux de voirie"]
+    )
+    assert _filtre(con_booleens, 'conseil ET PAS "étude de marché"') == [
+        "Conseil juridique"
+    ]
+
+
+def test_ou_pas_logique_stricte(con_booleens):
+    resultat = _filtre(con_booleens, "béton OU PAS ciment")
+    assert "Béton et ciment" in resultat
+    assert "Entretien des espaces verts" in resultat
+    assert "Fourniture de ciment" not in resultat
+    assert "Ciment et brique" not in resultat
+
+
+def test_phrase_exige_l_ordre(con_booleens):
+    assert _filtre(con_booleens, '"maintenance sur site"') == ["Maintenance sur site"]
+    assert _filtre(con_booleens, "maintenance site") == sorted(
+        ["Maintenance sur site", "Site de maintenance"]
+    )
+
+
+def test_phrases_colonne_multivaluee(con_booleens):
+    assert _filtre(
+        con_booleens,
+        '"Clause sociale" ET "Critère social"',
+        colonne="considerationsSociales",
+    ) == ["Travaux de béton"]
+
+
+def test_mots_cles_litteraux(con_booleens):
+    assert _filtre(con_booleens, "OUEST") == ["Réseau OUEST"]
+    assert _filtre(con_booleens, '"béton OU ciment"') == ["Béton ou ciment au choix"]
+    assert _filtre(con_booleens, "béton OU ciment") == _BETON_OU_CIMENT
+    assert _filtre(con_booleens, "béton ou ciment") == ["Béton ou ciment au choix"]
+
+
+def test_mots_cles_colles(con_booleens):
+    assert _filtre(con_booleens, "(béton)OU(ciment)") == _BETON_OU_CIMENT
+    assert _filtre(con_booleens, 'béton OU"ciment"') == _BETON_OU_CIMENT
+
+
+def test_jokers_et_plus(con_booleens):
+    assert _filtre(con_booleens, "maint*") == ["Maintenance sur site"]
+    assert _filtre(con_booleens, '"maint*"') == []
+    assert _filtre(con_booleens, "3+4") == ["Prix 3+4"]
+
+
+def test_normalisation_dans_une_phrase(con_booleens):
+    assert _filtre(con_booleens, '"maitrise d\'oeuvre"') == ["Maîtrise d’œuvre"]
+
+
+def test_colonne_date(con_booleens):
+    assert _filtre(
+        con_booleens, "2024 OU 2025", colonne="dateNotification", col_is_date=True
+    ) == sorted(["Conseil juridique", "Travaux de béton"])
+
+
+def test_contient_exclut_null_et_vide(con_booleens):
+    resultat = _filtre(con_booleens, "PAS construction")
+    assert None not in resultat
+    assert "" not in resultat
+    assert len(resultat) == 16
+    assert resultat == [o for o in _NON_VIDES if o != "Travaux de construction"]
+
+
+def test_ne_contient_pas_inclut_null_et_vide(con_booleens):
+    resultat = _filtre(con_booleens, "construction", negation=True)
+    assert None in resultat
+    assert "" in resultat
+
+
+def test_expression_vide_garde_seulement(con_booleens):
+    assert _filtre(con_booleens, "ET") == _NON_VIDES
+
+
+def test_non_abonne_mots_ordinaires(con_booleens):
+    assert _filtre(con_booleens, "béton OU ciment", operateurs=False) == [
+        "Béton ou ciment au choix"
+    ]
+
+
+def test_valeur_liee(con_booleens):
+    assert _filtre(con_booleens, "x' OR 1=1 --") == ["x' OR 1=1 --"]

@@ -290,3 +290,42 @@ def en_texte(expression: Expression) -> str:
 
 def libelle_corrections(expression: Expression) -> str:
     return ", ".join(expression.corrections)
+
+
+def _motif(terme: str, jokers: bool) -> str:
+    """Motif `ILIKE` d'une feuille déjà normalisée : pour un mot (`jokers`)
+    qui commence ou finit par `*`, tous ses `*` deviennent `%`
+    (préfixe/suffixe), sinon sous-chaîne ; une phrase est toujours une
+    sous-chaîne, `*` littéral."""
+    if jokers and (terme.startswith("*") or terme.endswith("*")):
+        return terme.replace("*", "%")
+    return f"%{terme}%"
+
+
+def _compiler(noeud, colonne: str, cible: str, params: list) -> str:
+    if isinstance(noeud, (Mot, Phrase)):
+        terme = normalize_text_term(colonne, noeud.texte)
+        params.append(_motif(terme, isinstance(noeud, Mot)))
+        return f"{cible} ILIKE ?"
+    if isinstance(noeud, Pas):
+        return f"NOT ({_compiler(noeud.enfant, colonne, cible, params)})"
+    liaison = " AND " if isinstance(noeud, Et) else " OR "
+    return liaison.join(
+        f"({_compiler(e, colonne, cible, params)})" for e in noeud.enfants
+    )
+
+
+def en_sql(
+    expression: Expression, colonne: str, col_is_date: bool = False
+) -> tuple[str, list]:
+    """Clause SQL paramétrée du filtre _contient_ : la garde « non vide »
+    suivie de l'expression compilée, chaque feuille étant un `ILIKE ?` sur
+    la colonne cible. Expression vide : la garde seule."""
+    quoted_col = f'CAST("{colonne}" AS VARCHAR)' if col_is_date else f'"{colonne}"'
+    garde = f"\"{colonne}\" IS NOT NULL AND {quoted_col} <> ''"
+    if expression.arbre is None:
+        return garde, []
+    params: list = []
+    cible = text_filter_target(colonne, quoted_col)
+    clause = _compiler(expression.arbre, colonne, cible, params)
+    return f"{garde} AND ({clause})", params

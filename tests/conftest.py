@@ -181,3 +181,49 @@ def con_objets():
     )
     con.execute(f"UPDATE decp SET objet_normalise = {normalize_text_sql('objet')}")
     return con
+
+
+_LIGNES_BOOLEENS = [
+    ("Travaux de béton", "Clause sociale, Critère social", "2024-03-01"),
+    ("Béton et ciment", None, "2023-06-01"),
+    ("Béton ou ciment au choix", None, "2023-06-01"),
+    ("Fourniture de ciment", None, "2023-06-01"),
+    ("Brique et béton", None, "2023-06-01"),
+    ("Ciment et brique", None, "2023-06-01"),
+    ("Entretien des espaces verts", None, "2023-06-01"),
+    ("Travaux de construction", None, "2023-06-01"),
+    ("Travaux de voirie", "Critère social", "2023-06-01"),
+    ("Conseil en étude de marché", None, "2023-06-01"),
+    ("Conseil juridique", "Clause sociale", "2025-01-01"),
+    ("Maintenance sur site", None, "2023-06-01"),
+    ("Site de maintenance", None, "2023-06-01"),
+    ("Maîtrise d’œuvre", None, "2023-06-01"),
+    ("Réseau OUEST", None, "2023-06-01"),
+    ("Prix 3+4", None, "2023-06-01"),
+    ("x' OR 1=1 --", None, "2023-06-01"),
+    (None, None, "2023-06-01"),
+    ("", None, "2023-06-01"),
+]
+
+
+@pytest.fixture
+def con_booleens():
+    """DuckDB en mémoire avec la table `decp` des tests de filtres booléens
+    (#97) : 17 objets non vides, un NULL et une chaîne vide. `objet_normalise`
+    est calculée comme au build (`normalize_text_sql`)."""
+    import duckdb
+
+    from src.utils.text_normalization import normalize_text_sql
+
+    con = duckdb.connect(":memory:")
+    con.execute(
+        "CREATE TABLE decp (objet VARCHAR, objet_normalise VARCHAR, "
+        '"considerationsSociales" VARCHAR, "dateNotification" DATE)'
+    )
+    con.executemany(
+        'INSERT INTO decp (objet, "considerationsSociales", "dateNotification") '
+        "VALUES (?, ?, CAST(? AS DATE))",
+        _LIGNES_BOOLEENS,
+    )
+    con.execute(f"UPDATE decp SET objet_normalise = {normalize_text_sql('objet')}")
+    return con
