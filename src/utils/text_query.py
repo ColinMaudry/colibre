@@ -98,8 +98,8 @@ def _lexique(texte: str, operateurs: bool, corrections: list) -> list[_Jeton]:
             if fin == -1:
                 corrections.append((i, "guillemet manquant"))
                 fin = n
-            contenu = " ".join(texte[i + 1 : fin].split())
-            if contenu:
+            contenu = texte[i + 1 : fin]
+            if contenu.strip():
                 jetons.append(_Jeton("phrase", i, contenu))
             else:
                 corrections.append((i, "guillemets vides"))
@@ -154,29 +154,34 @@ def _equilibrer(jetons: list[_Jeton], corrections: list) -> list[_Jeton]:
     return resultat
 
 
-def _nettoyer_une_fois(jetons: list[_Jeton], corrections: list) -> bool:
-    """Applique la première réparation trouvée ; renvoie vrai si modifié."""
-    for i, jeton in enumerate(jetons):
+def _nettoyer(jetons: list[_Jeton], corrections: list) -> None:
+    """Supprime les opérateurs orphelins et les parenthèses vides jusqu'à
+    stabilité. Après une suppression, l'examen reprend juste avant elle :
+    seuls les voisins du trou peuvent être devenus invalides (coût linéaire)."""
+    i = 0
+    while i < len(jetons):
+        jeton = jetons[i]
         precedent = jetons[i - 1].genre if i > 0 else None
         suivant = jetons[i + 1] if i + 1 < len(jetons) else None
         genre_suivant = suivant.genre if suivant else None
-        if jeton.genre in ("ET", "OU"):
-            if precedent not in _FINS or genre_suivant not in _DEBUTS:
-                corrections.append((jeton.position, f"{jeton.genre} orphelin"))
-                del jetons[i]
-                return True
-        elif jeton.genre == "PAS":
-            if genre_suivant not in _DEBUTS:
-                corrections.append((jeton.position, "PAS orphelin"))
-                debut = i - 1 if precedent in ("ET", "OU") else i
-                del jetons[debut : i + 1]
-                return True
+        if jeton.genre in ("ET", "OU") and (
+            precedent not in _FINS or genre_suivant not in _DEBUTS
+        ):
+            corrections.append((jeton.position, f"{jeton.genre} orphelin"))
+            del jetons[i]
+        elif jeton.genre == "PAS" and genre_suivant not in _DEBUTS:
+            corrections.append((jeton.position, "PAS orphelin"))
+            if precedent in ("ET", "OU"):
+                i -= 1
+            del jetons[i : i + (2 if precedent in ("ET", "OU") else 1)]
         elif jeton.genre == "(" and genre_suivant == ")":
             if not suivant.synthetique:
                 corrections.append((jeton.position, "parenthèses vides"))
             del jetons[i : i + 2]
-            return True
-    return False
+        else:
+            i += 1
+            continue
+        i = max(i - 2, 0)
 
 
 def _aplatir(classe, enfants: list):
@@ -209,14 +214,14 @@ class _Analyseur:
         return _aplatir(Et, enfants)
 
     def pas(self):
+        # Les PAS consécutifs se réduisent selon leur parité, pour qu'aucune
+        # chaîne de nœuds ne croisse avec la longueur de la saisie.
         negations = 0
         while self._genre() == "PAS":
             negations += 1
             self.i += 1
         noeud = self.atome()
-        for _ in range(negations):
-            noeud = Pas(noeud)
-        return noeud
+        return Pas(noeud) if negations % 2 else noeud
 
     def atome(self):
         jeton = self.jetons[self.i]
@@ -249,8 +254,7 @@ def analyser(texte: str, operateurs: bool) -> Expression:
         return Expression(texte, arbre, [], ignores)
 
     jetons = _equilibrer(jetons, corrections)
-    while _nettoyer_une_fois(jetons, corrections):
-        pass
+    _nettoyer(jetons, corrections)
     arbre = _Analyseur(jetons).ou() if jetons else None
 
     libelles = []

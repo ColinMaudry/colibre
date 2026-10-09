@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from src.utils.text_query import analyser, en_texte, libelle_corrections
@@ -77,3 +79,23 @@ def test_non_abonne():
 
 def test_abonne_n_ignore_rien():
     assert analyser("béton OU ciment", True).operateurs_ignores is False
+
+
+def test_pas_consecutifs_sans_recursion():
+    expr = analyser("PAS " * 3000 + "x )", True)
+    assert en_texte(expr) == "x"  # 3000 négations : nombre pair
+    assert libelle_corrections(expr) == "parenthèse en trop"
+    expr = analyser("PAS " * 3001 + "x )", True)
+    assert en_texte(expr) == "PAS x"
+
+
+def test_nettoyage_lineaire():
+    debut = time.perf_counter()
+    analyser("PAS " * 10000, True)
+    analyser("a OU " * 10000, True)
+    assert time.perf_counter() - debut < 2
+
+
+def test_phrase_litterale():
+    expr = analyser('"maintenance   sur" )', True)
+    assert en_texte(expr) == '"maintenance   sur"'
