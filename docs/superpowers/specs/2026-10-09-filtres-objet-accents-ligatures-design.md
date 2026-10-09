@@ -4,7 +4,7 @@ Date : 2026-10-09
 
 ## Objectif
 
-Un filtre sur le champ `objet` retrouve les mêmes marchés quelle que soit la
+Un filtre sur le champ `objet` (interface, API REST, connecteur MCP) retrouve les mêmes marchés quelle que soit la
 graphie saisie : accents présents ou non, « œ » ou « oe », « æ » ou « ae »,
 apostrophe droite `'` ou typographique `’`. La casse est déjà ignorée.
 
@@ -15,14 +15,14 @@ Le filtre ne doit pas devenir sensiblement plus lent qu'aujourd'hui.
 
 ## Décisions de cadrage
 
-| Sujet                | Décision                                                                                                   | Motif                                                                                                                                                     |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Normalisation        | Colonne **précalculée** `objet_normalise` dans `decp`, construite au build                                 | Normaliser à la volée multiplie par 4 à 6 la latence d'un appel de grille (≈ 1 s → 4 à 8 s sur 3,3 M de lignes, mesuré sous charge). Choix de Colin       |
-| Apostrophes          | `’` (U+2019) est normalisée en `'` des deux côtés                                                          | 1 143 889 objets contiennent `’`, 14 057 contiennent `'` : sans cela, l'exemple de l'issue tapé avec `'` ne retourne rien. Choix de Colin                 |
-| Périmètre des champs | `objet` seulement                                                                                          | `acheteur_nom` et `titulaire_nom` changeront de format côté `decp-processing` : traités dans une issue séparée, que ce mécanisme prépare (voir « Suite ») |
-| Opérateurs           | `contains`, `notContains`, `startsWith`, `endsWith` sont normalisés. `equals` et `notEqual` restent exacts | Une égalité exacte doit pouvoir distinguer deux graphies                                                                                                  |
-| Surfaces             | Grilles `/tableau`, acheteur, titulaire, et filtre Objet de l'observatoire                                 | Ce sont les chemins qui passent par `tokenize_text_filter` et `query_ast`                                                                                 |
-| Hors surface         | API REST `/data` (`objet__contains`) et outil MCP `objet_contient`                                         | Ils utilisent un autre `ILIKE` (`src/api/filters.py`) ; non demandé par l'issue                                                                           |
+| Sujet                | Décision                                                                                                            | Motif                                                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Normalisation        | Colonne **précalculée** `objet_normalise` dans `decp`, construite au build                                          | Normaliser à la volée multiplie par 4 à 6 la latence d'un appel de grille (≈ 1 s → 4 à 8 s sur 3,3 M de lignes, mesuré sous charge). Choix de Colin       |
+| Apostrophes          | `’` (U+2019) est normalisée en `'` des deux côtés                                                                   | 1 143 889 objets contiennent `’`, 14 057 contiennent `'` : sans cela, l'exemple de l'issue tapé avec `'` ne retourne rien. Choix de Colin                 |
+| Périmètre des champs | `objet` seulement                                                                                                   | `acheteur_nom` et `titulaire_nom` changeront de format côté `decp-processing` : traités dans une issue séparée, que ce mécanisme prépare (voir « Suite ») |
+| Opérateurs           | `contains`, `notContains`, `startsWith`, `endsWith` sont normalisés. `equals` et `notEqual` restent exacts          | Une égalité exacte doit pouvoir distinguer deux graphies                                                                                                  |
+| Surfaces             | Grilles `/tableau`, acheteur, titulaire ; filtre Objet de l'observatoire ; API REST `/data` ; MCP                   | Interface : `tokenize_text_filter` et `query_ast`. API et MCP : `build_where` (`src/api/filters.py`). Élargissement demandé par Colin le 2026-10-09       |
+| API et MCP           | `contains`, `notcontains` et `startswith` sur `objet` sont normalisés ; sémantique de sous-chaîne entière conservée | L'API n'a pas de découpage en mots ni de jokers ; on ne change que la comparaison                                                                         |
 
 ## Contexte : l'existant et les mesures
 
@@ -35,6 +35,10 @@ Le filtre ne doit pas devenir sensiblement plus lent qu'aujourd'hui.
   moins un caractère accentué.
 - Les opérateurs `startsWith` et `endsWith` de `query_ast.py` n'utilisaient pas
   `tokenize_text_filter` : ils étaient eux aussi sensibles aux accents.
+- L'API REST `/data` (`src/api/filters.py`, `build_where`) et le MCP
+  (`rechercher_marches`, paramètre `objet_contient`) utilisent un `ILIKE` distinct, sur
+  la sous-chaîne entière (`%valeur%`), sans normalisation : ils étaient sensibles aux
+  accents et aux ligatures. Le MCP appelle le même `build_where` que l'API.
 - Le chemin Polars historique (`prepare_table_data`, `filter_table_data`,
   `filter_query_to_sql`) n'était appelé par aucune page : c'était du code mort,
   supprimé dans ce chantier (voir « Code mort supprimé »).
@@ -70,9 +74,15 @@ Module sans dépendance interne, importable par `src/db.py` comme par
   et `’→'`. Ne change pas la casse : l'`ILIKE` s'en charge.
 - `normalize_text_sql(expr: str) -> str` : expression DuckDB équivalente, à base
   de `strip_accents` et de `replace` imbriqués.
+- `normalized_target(column: str, quoted_col: str) -> str` : renvoie la colonne
+  précalculée (entre guillemets) si `column` figure dans `NORMALIZED_COLUMNS`, et
+  `quoted_col` sinon. Utilisée par la grille et par l'API.
+- `normalized_term(column: str, term: str) -> str` : applique `normalize_text` si
+  `column` figure dans `NORMALIZED_COLUMNS`, et renvoie `term` sinon.
 
-Les deux fonctions doivent produire le même résultat. Un test de parité le
-vérifie (voir « Tests »).
+`normalize_text` et `normalize_text_sql` doivent produire le même résultat : la
+colonne est calculée par DuckDB, la saisie par Python. Un test de parité le vérifie
+(voir « Tests »).
 
 ### 2. `src/db.py`
 
@@ -96,10 +106,10 @@ Les tables `acheteurs_marches`, `titulaires_marches`, `acheteurs_departement` et
 
 ### 3. `src/utils/table_sql.py` et `src/utils/query_ast.py`
 
-- `text_filter_target(column, quoted_col)` renvoie `"objet_normalise"` pour les
-  colonnes de `NORMALIZED_COLUMNS`, et `quoted_col` sinon.
-- `normalize_text_term(column, term)` applique `normalize_text` pour les colonnes
-  de `NORMALIZED_COLUMNS`, `unidecode` pour `_ACCENT_INSENSITIVE_COLUMNS`
+- `text_filter_target(column, quoted_col)` délègue à `normalized_target` ; elle ne
+  contient plus de cas particulier pour `objet`.
+- `normalize_text_term(column, term)` délègue à `normalized_term` pour les colonnes
+  de `NORMALIZED_COLUMNS`, applique `unidecode` pour `_ACCENT_INSENSITIVE_COLUMNS`
   (`acheteur_nom`, `titulaire_nom`, inchangé), et ne touche pas les autres.
 - `tokenize_text_filter` garde ses conditions `IS NOT NULL` et `<> ''` sur la
   colonne d'origine et compare la colonne cible à la saisie normalisée. Les
@@ -110,7 +120,25 @@ Les tables `acheteurs_marches`, `titulaires_marches`, `acheteurs_departement` et
   (`_strip_accents_sql`, `_strip_accents`, `_LIGATURES`,
   `_ACCENT_NORMALIZED_COLUMNS`) est remplacé : il n'en reste rien.
 
-### 4. Code mort supprimé (déjà fait dans ce chantier)
+### 4. `src/api/filters.py` (API REST et MCP)
+
+Le MCP passe par le même `build_where` que l'API : `objet_contient` devient
+`objet__contains` (`src/mcp/queries.py`, `_NAMED_FILTERS`), et `filtres_avances`
+accepte aussi `objet__contains`, `objet__notcontains` et `objet__startswith`. Un seul
+changement couvre donc les deux.
+
+- Pour les opérateurs `contains`, `notcontains` et `startswith`, si la colonne figure
+  dans `NORMALIZED_COLUMNS`, `build_where` compare la colonne précalculée
+  (`normalized_target`) à la valeur normalisée (`normalized_term`).
+- La sémantique reste celle de l'API : sous-chaîne **entière** (`%valeur%`), sans
+  découpage en mots ni jokers `*` et `+` (qui sont propres à la grille).
+- `exact`, `differs`, `in`, `notin`, les comparaisons, `isnull`, `isnotnull` et `sort`
+  restent sur la colonne d'origine : une égalité exacte doit pouvoir distinguer deux
+  graphies, et un tri se fait sur le texte affiché.
+- `objet_normalise` reste inconnue de l'API (`col not in schema` → 400) : elle n'est
+  pas filtrable ni sélectionnable directement.
+
+### 5. Code mort supprimé (déjà fait dans ce chantier)
 
 Aucune page n'appelait `prepare_table_data` : l'ancien chemin `dash_table`, remplacé
 par AG Grid, ne servait plus qu'aux tests. Supprimés :
@@ -141,6 +169,16 @@ Tous exécutent de vraies requêtes DuckDB ; aucun ne fige le texte SQL.
   - jokers et phrases ; `NULL` et chaîne vide jamais retournés ;
   - le filtre Objet de l'observatoire ;
   - `acheteur_nom` et `titulaire_nom` inchangés.
+- **API REST et MCP** (`tests/api/`, `tests/mcp/`) : exécutés dans un DuckDB avec
+  `objet_normalise`, via `build_where` :
+  - `objet__contains`, `objet__notcontains` et `objet__startswith` retrouvent les
+    3 graphies de l'issue avec chacune des saisies ; `objet__exact` reste exact ;
+  - `search_marches(objet_contient="maitrise d'oeuvre")` retourne les marchés
+    attendus ;
+  - `acheteur_nom__contains` garde son comportement actuel ;
+  - les tests de `tests/api/test_filters.py` qui figent le texte SQL de `objet`
+    (`'"objet" ILIKE ?'`, `'"objet" NOT ILIKE ?'`) sont remplacés par ces tests de
+    comportement, car ils décrivent l'implémentation et non le résultat.
 - **Parité** : `normalize_text` (Python) et `normalize_text_sql` (DuckDB) donnent le
   même résultat sur un échantillon couvrant é è ê ë à ç î ï ô ù û ü ñ, majuscules
   accentuées, œ Œ æ Æ, `’`, caractères non latins et chaîne vide.
@@ -153,7 +191,9 @@ Tous exécutent de vraies requêtes DuckDB ; aucun ne fige le texte SQL.
   `uv run pytest -m selenium`.
 - **Smoke** : sur `decp_prod.parquet`, `fetch_grid_page` avec « maitrise d'oeuvre »,
   « MAÎTRISE D’ŒUVRE » et « maîtrise d’œuvre » retourne le même total, dans un
-  temps comparable à un filtre sans normalisation.
+  temps comparable à un filtre sans normalisation. `GET /data?objet__contains=…`
+  et `search_marches(objet_contient=…)` retournent le même total pour ces trois
+  saisies.
 
 ## Déploiement
 
@@ -166,12 +206,18 @@ Tous exécutent de vraies requêtes DuckDB ; aucun ne fige le texte SQL.
   existant). Celle-ci n'a pas `objet_normalise` : les filtres sur `objet` lèvent alors
   une erreur DuckDB tant que la base n'est pas reconstruite. Même mode de défaillance
   que l'incident du 2026-07-30 décrit dans `src/db.py`.
-- `CHANGELOG.md` : « les filtres sur l'objet ne sont plus sensibles aux accents, à œ/oe
-  ni à l'apostrophe typographique (#147) ».
+- `CHANGELOG.md` : « les filtres sur l'objet (interface, API REST, connecteur MCP) ne
+  sont plus sensibles aux accents, à œ/oe ni à l'apostrophe typographique (#147) ».
+- Documentation : `src/api/routes.py` (description des opérateurs `contains`,
+  `notcontains`, `startswith`) et la docstring de l'outil MCP `rechercher_marches`
+  (`objet_contient`, `src/mcp/tools.py`) précisent que la comparaison ignore casse,
+  accents, ligatures et apostrophes typographiques sur `objet`.
 
 ## Hors périmètre
 
-- API REST `/data` et outil MCP (voir « Décisions de cadrage »).
+- Les opérateurs de l'API qui doivent rester exacts (`exact`, `differs`, `in`,
+  `notin`, `sort`) et les filtres de l'API sur les autres colonnes
+  (`acheteur_nom__contains`, etc.) : inchangés.
 - `¿` (U+00BF, 15 888 objets) : défaut d'encodage des données sources (« D¿OEUVRE »),
   à corriger en amont dans `decp-processing`, pas ici.
 - Autres apostrophes : `‘` apparaît dans 399 objets, `´` dans 20, `` ` `` dans 7.
