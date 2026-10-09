@@ -164,3 +164,60 @@ def test_reinitialisation_fiche_emet(monkeypatch):
     envois = _capturer_actions(monkeypatch)
     _get_reset_callback("titulaire")(1, [])
     assert envois == [("Titulaire", "reinitialisation")]
+
+
+def _appeler_observatoire(monkeypatch, triggered_id, valeurs):
+    from types import SimpleNamespace
+
+    import src.app  # noqa: F401
+    from src.pages import observatoire
+
+    envois = []
+    monkeypatch.setattr(
+        "src.utils.suivi.set_props", lambda cid, p: envois.append(p["data"])
+    )
+    monkeypatch.setattr(observatoire, "_compute_dashboard_children", lambda *a: [])
+    monkeypatch.setattr(observatoire, "current_theme", lambda: "clair")
+    monkeypatch.setattr(observatoire, "ctx", SimpleNamespace(triggered_id=triggered_id))
+    monkeypatch.setattr(observatoire, "current_user_has_subscription", lambda: False)
+    filtres = [valeurs.get(fp[0], fp[3]) for fp in observatoire.FILTER_PARAMS]
+    observatoire.update_dashboard_cards(None, *filtres)
+    return [(d["categorie"], d["action"], d["nom"], d["valeur"]) for d in envois]
+
+
+def test_filtre_observatoire_emet(monkeypatch):
+    envois = _appeler_observatoire(
+        monkeypatch, "dashboard_marche_objet", {"dashboard_marche_objet": "voirie"}
+    )
+    assert envois == [("Observatoire", "filtres", 'objet = "voirie"', 1)]
+
+
+def test_chargement_initial_n_emet_pas(monkeypatch):
+    envois = _appeler_observatoire(
+        monkeypatch, None, {"dashboard_marche_objet": "voirie"}
+    )
+    assert envois == []
+
+
+def test_changement_d_ordre_des_tuiles_n_emet_pas(monkeypatch):
+    envois = _appeler_observatoire(
+        monkeypatch, "observatoire-card-order", {"dashboard_marche_objet": "voirie"}
+    )
+    assert envois == []
+
+
+def test_jeu_vide_n_emet_pas(monkeypatch):
+    envois = _appeler_observatoire(monkeypatch, "dashboard_marche_objet", {})
+    assert envois == []
+
+
+def test_valeurs_par_defaut_n_emettent_pas(monkeypatch):
+    envois = _appeler_observatoire(
+        monkeypatch,
+        "dashboard_marche_innovant",
+        {
+            "dashboard_marche_innovant": "all",
+            "dashboard_marche_sous_traitance_declaree": "all",
+        },
+    )
+    assert envois == []

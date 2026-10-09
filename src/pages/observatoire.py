@@ -44,7 +44,7 @@ from src.utils.frontend import (
     get_enum_values_as_dict,
 )
 from src.utils.seo import META_CONTENT
-from src.utils.suivi import emettre
+from src.utils.suivi import emettre, serialiser_filtres_observatoire
 from src.utils.table import format_number, write_csv, write_styled_excel
 from src.utils.table_sql import dashboard_filters_to_sql
 from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
@@ -591,6 +591,20 @@ def update_dashboard_cards(card_order, *filter_values):
         FILTER_PARAMS, filter_values
     ):
         filter_params[input_id] = value
+
+    if ctx.triggered_id in filter_params:
+        # Les valeurs par défaut (ex. « all ») ne sont pas des filtres actifs.
+        nom, nb = serialiser_filtres_observatoire(
+            {
+                url_key: value
+                for (_id, url_key, _multi, default), value in zip(
+                    FILTER_PARAMS, filter_values
+                )
+                if value != default
+            }
+        )
+        if nb:
+            emettre("Observatoire", "filtres", nom, nb)
 
     filter_params_normalized = _normalize_filter_params(filter_params)
     children = _compute_dashboard_children(filter_params_normalized, current_theme())
