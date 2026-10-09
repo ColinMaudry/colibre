@@ -37,6 +37,7 @@ from src.utils.data import (
     DF_TITULAIRES,
     prepare_dashboard_data,
 )
+from src.utils.filter_pills import banniere_operateurs
 from src.utils.frontend import (
     DROPDOWN_LABELS_FR,
     EXCEL_MAX_ROWS,
@@ -47,6 +48,7 @@ from src.utils.seo import META_CONTENT
 from src.utils.suivi import emettre, serialiser_filtres_observatoire
 from src.utils.table import format_number, write_csv, write_styled_excel
 from src.utils.table_sql import dashboard_filters_to_sql
+from src.utils.text_query import analyser, en_texte, libelle_corrections
 from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
 
 NAME = "Observatoire"
@@ -214,14 +216,20 @@ layout = [
                                     ),
                                     dbc.Row(
                                         dbc.Col(
-                                            dcc.Input(
-                                                id="dashboard_marche_objet",
-                                                placeholder="Objet",
-                                                debounce=True,
-                                                style={"width": "100%"},
-                                                persistence=True,
-                                                persistence_type="local",
-                                            ),
+                                            [
+                                                dcc.Input(
+                                                    id="dashboard_marche_objet",
+                                                    placeholder="Objet",
+                                                    debounce=True,
+                                                    style={"width": "100%"},
+                                                    persistence=True,
+                                                    persistence_type="local",
+                                                ),
+                                                dbc.FormText(
+                                                    id="dashboard_marche_objet_aide",
+                                                    className="filtre-objet-aide",
+                                                ),
+                                            ]
                                         ),
                                     ),
                                     dbc.Row(
@@ -736,6 +744,29 @@ def download_observatoire(_n_clicks, filter_params):
 )
 def toggle_montant_modal(n_triggers, _close):
     return isinstance(ctx.triggered_id, dict) and any(n_triggers)
+
+
+def aide_objet(texte: str | None, operateurs: bool) -> list | None:
+    """Aide affichée sous le champ Objet : filtre réellement appliqué quand
+    la saisie a été corrigée, ou bandeau d'abonnement quand des opérateurs
+    ont été ignorés. `None` si rien à signaler."""
+    if not texte or not texte.strip():
+        return None
+    expression = analyser(texte, operateurs)
+    if expression.corrections:
+        applique = en_texte(expression) or "n'est pas vide"
+        return [f"Filtre appliqué : {applique} ({libelle_corrections(expression)})"]
+    if expression.operateurs_ignores:
+        return [banniere_operateurs()]
+    return None
+
+
+@callback(
+    Output("dashboard_marche_objet_aide", "children"),
+    Input("dashboard_marche_objet", "value"),
+)
+def afficher_aide_objet(objet):
+    return aide_objet(objet, current_user_has_subscription())
 
 
 @callback(

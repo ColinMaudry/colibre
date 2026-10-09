@@ -413,6 +413,10 @@ input[type="email"] {
   color: var(--bs-warning-text-emphasis);
   box-shadow: inset 0 0 0 1px var(--bs-warning-border-subtle);
 }
+/* Aide sous le champ Objet de l'observatoire (#97) */
+.filtre-objet-aide {
+  color: var(--bs-warning-text-emphasis);
+}
 
 /* Légende des boutons en tête du mode d'emploi : boutons reproduits à
    l'identique mais inertes, alignés en face de leur fonction. */
