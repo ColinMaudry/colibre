@@ -426,3 +426,19 @@ def test_colonnes_normalisees_masquees_du_schema():
     assert query_marches(columns=["objet_normalise"], limit=1).columns == [
         "objet_normalise"
     ]
+
+
+def test_schema_tolere_une_base_sans_colonne_normalisee():
+    """Si la reconstruction échoue, `_ensure_database` réutilise l'ancienne base,
+    qui n'a pas `objet_normalise` : charger le schéma ne doit pas faire planter
+    l'import de `src.db` (seuls les filtres Objet doivent échouer)."""
+    import duckdb
+
+    from src.db import _load_schema
+
+    con = duckdb.connect(":memory:")
+    con.execute("CREATE TABLE decp (uid VARCHAR, objet VARCHAR)")
+    assert _load_schema(con).names() == ["uid", "objet"]
+
+    con.execute("ALTER TABLE decp ADD COLUMN objet_normalise VARCHAR")
+    assert _load_schema(con).names() == ["uid", "objet"]

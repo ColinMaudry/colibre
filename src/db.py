@@ -173,10 +173,22 @@ def _load_source_frame() -> pl.DataFrame:
 SCHEMA_VERSION = 3
 
 # Colonnes techniques précalculées à la construction (#147). Elles servent aux
-# filtres, jamais à l'affichage : `schema` et `SELECT *` les excluent pour
-# qu'elles n'apparaissent ni dans les grilles, ni dans les exports, ni dans
-# l'API.
-_EXCLUDE_NORMALIZED = f"EXCLUDE ({', '.join(NORMALIZED_COLUMNS.values())})"
+# filtres, jamais à l'affichage : `schema` ne les contient pas, donc ni les
+# grilles, ni les exports, ni l'API ne les voient.
+_TECHNICAL_COLUMNS = set(NORMALIZED_COLUMNS.values())
+
+
+def _load_schema(c: duckdb.DuckDBPyConnection) -> pl.Schema:
+    """Schéma visible de `decp`, sans les colonnes techniques.
+
+    Filtré côté Python plutôt qu'avec `SELECT * EXCLUDE (...)` : si la
+    reconstruction échoue et que `_ensure_database` réutilise une ancienne base
+    sans ces colonnes, `EXCLUDE` d'une colonne absente lèverait une erreur à
+    l'import et ferait tomber tout le site, pas seulement les filtres Objet.
+    """
+    full = c.execute("SELECT * FROM decp LIMIT 0").pl().schema
+    return pl.Schema({n: t for n, t in full.items() if n not in _TECHNICAL_COLUMNS})
+
 
 # Extraites en constantes de module (plutôt qu'inline dans build_database)
 # pour que tests/seo/test_tables_nb_marches.py puisse exécuter cette logique
@@ -283,9 +295,7 @@ def _ensure_database() -> Path:
 DB_PATH = _ensure_database()
 conn: duckdb.DuckDBPyConnection = duckdb.connect(str(DB_PATH), read_only=True)
 configure_connection(conn)
-schema: pl.Schema = (
-    conn.execute(f"SELECT * {_EXCLUDE_NORMALIZED} FROM decp LIMIT 0").pl().schema
-)
+schema: pl.Schema = _load_schema(conn)
 
 
 def get_cursor() -> duckdb.DuckDBPyConnection:
@@ -307,7 +317,9 @@ def query_marches(
     code, never user input). `params` values are passed through DuckDB's
     parameter binding.
     """
-    cols = ", ".join(columns) if columns else f"* {_EXCLUDE_NORMALIZED}"
+    cols = (
+        ", ".join(columns) if columns else ", ".join(f'"{c}"' for c in schema.names())
+    )
     sql = f"SELECT {cols} FROM decp WHERE {where_sql}"
     if order_by:
         sql += f" ORDER BY {order_by}"
