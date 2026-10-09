@@ -11,12 +11,8 @@ from dataclasses import dataclass
 import polars as pl
 
 from src.utils import logger
-from src.utils.table_sql import (
-    normalize_text_term,
-    sort_by_to_sql,
-    text_filter_target,
-    tokenize_text_filter,
-)
+from src.utils.table_sql import sort_by_to_sql, tokenize_text_filter
+from src.utils.text_query import normalize_text_term, text_filter_target
 
 
 @dataclass
