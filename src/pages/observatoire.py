@@ -620,8 +620,9 @@ def update_dashboard_cards(card_order, *filter_values):
             emettre("Observatoire", "filtres", nom, nb)
 
     filter_params_normalized = _normalize_filter_params(filter_params)
+    abonne = current_user_has_subscription()
     children = _compute_dashboard_children(
-        filter_params_normalized, current_theme(), current_user_has_subscription()
+        filter_params_normalized, current_theme(), abonne
     )
 
     # L'ordre est appliqué APRÈS le cache mémoïsé : le mettre dans
@@ -630,7 +631,7 @@ def update_dashboard_cards(card_order, *filter_values):
     if card_order:
         children = reorder_cards(children, card_order)
 
-    if current_user_has_subscription():
+    if abonne:
         children = [cards_drag_marker("observatoire-card-order-nouveau"), *children]
 
     return dbc.Row(children=children), filter_params

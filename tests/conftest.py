@@ -258,3 +258,59 @@ def con_booleens():
     )
     con.execute(f"UPDATE decp SET objet_normalise = {normalize_text_sql('objet')}")
     return con
+
+
+@pytest.fixture
+def sans_abonnement(monkeypatch):
+    """Callbacks appelés hors requête : pas d'utilisateur courant, donc pas
+    d'abonnement (#97). À demander explicitement (usefixtures)."""
+    import src.app  # noqa: F401  (les pages exigent l'app Dash instanciée)
+    from src.pages import acheteur, observatoire, tableau, titulaire
+    from src.utils import entity_grid
+
+    for module in (tableau, observatoire, acheteur, titulaire, entity_grid):
+        monkeypatch.setattr(
+            module, "current_user_has_subscription", lambda: False, raising=True
+        )
+
+
+@pytest.fixture(scope="module")
+def flask_app():
+    """Flask app minimale avec SimpleCache pour que @cache.memoize()
+    fonctionne en test (même pattern que tests/test_grid.py)."""
+    from flask import Flask
+
+    from src.utils.cache import cache
+
+    app = Flask(__name__)
+    cache.init_app(app, config={"CACHE_TYPE": "SimpleCache"})
+    return app
+
+
+@pytest.fixture
+def reset_cache(flask_app):
+    """Cache vidé et contexte applicatif actif ; à demander via usefixtures."""
+    from src.utils.cache import cache
+
+    with flask_app.app_context():
+        try:
+            cache.clear()
+        except (RuntimeError, AttributeError):
+            pass
+        yield
+
+
+@pytest.fixture
+def observatoire_mod():
+    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
+    from src.pages import observatoire
+
+    return observatoire
+
+
+@pytest.fixture
+def tableau_mod():
+    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
+    from src.pages import tableau
+
+    return tableau

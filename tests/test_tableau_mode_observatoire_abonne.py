@@ -12,8 +12,7 @@ import time
 from dash.testing.composite import DashComposite
 from selenium.webdriver.common.by import By
 
-from tests._selenium_compte import ouvrir_le_tableau as _ouvrir_le_tableau
-from tests._selenium_compte import se_connecter as _se_connecter
+from tests._selenium_compte import ouvrir_le_tableau, se_connecter
 
 
 def test_linterrupteur_souvre_a_une_session_abonnee(
@@ -22,8 +21,8 @@ def test_linterrupteur_souvre_a_une_session_abonnee(
     from src.app import app
 
     dash_duo.start_server(app)
-    _se_connecter(dash_duo)
-    _ouvrir_le_tableau(dash_duo)
+    se_connecter(dash_duo)
+    ouvrir_le_tableau(dash_duo)
 
     interrupteur = dash_duo.driver.find_element(By.ID, "tableau-mode-observatoire")
 
@@ -36,8 +35,8 @@ def test_la_bascule_affiche_les_cards_du_filtre_courant(
     from src.app import app
 
     dash_duo.start_server(app)
-    _se_connecter(dash_duo)
-    _ouvrir_le_tableau(dash_duo)
+    se_connecter(dash_duo)
+    ouvrir_le_tableau(dash_duo)
     driver = dash_duo.driver
 
     champ = driver.find_element(
@@ -64,8 +63,8 @@ def test_sans_filtre_la_bascule_invite_a_en_poser_un(
     from src.app import app
 
     dash_duo.start_server(app)
-    _se_connecter(dash_duo)
-    _ouvrir_le_tableau(dash_duo)
+    se_connecter(dash_duo)
+    ouvrir_le_tableau(dash_duo)
     driver = dash_duo.driver
 
     driver.find_element(By.ID, "tableau-mode-observatoire").click()
@@ -82,8 +81,8 @@ def test_un_compte_sans_acces_garde_linterrupteur_ferme(
     from src.app import app
 
     dash_duo.start_server(app)
-    _se_connecter(dash_duo)
-    _ouvrir_le_tableau(dash_duo)
+    se_connecter(dash_duo)
+    ouvrir_le_tableau(dash_duo)
 
     interrupteur = dash_duo.driver.find_element(By.ID, "tableau-mode-observatoire")
     enveloppe = dash_duo.driver.find_element(By.ID, "tableau-mode-observatoire-wrapper")
@@ -106,8 +105,8 @@ def test_le_mode_observatoire_persiste_apres_rechargement(
     from src.app import app
 
     dash_duo.start_server(app)
-    _se_connecter(dash_duo)
-    _ouvrir_le_tableau(dash_duo)
+    se_connecter(dash_duo)
+    ouvrir_le_tableau(dash_duo)
     driver = dash_duo.driver
 
     # Bascule en mode observatoire (sans filtre → message d'invitation, mais le
@@ -123,7 +122,7 @@ def test_le_mode_observatoire_persiste_apres_rechargement(
 
     # Rechargement : le mode doit être restauré côté client.
     driver.get(f"{dash_duo.server_url}/tableau")
-    _ouvrir_le_tableau(dash_duo)
+    ouvrir_le_tableau(dash_duo)
 
     wrapper = driver.find_element(By.ID, "tableau-mode-wrapper")
     assert "mode-observatoire" in wrapper.get_attribute("class")
@@ -139,15 +138,15 @@ def test_un_ex_abonne_ne_restaurateur_pas_le_mode_observatoire(
     from src.app import app
 
     dash_duo.start_server(app)
-    _se_connecter(dash_duo)
-    _ouvrir_le_tableau(dash_duo)
+    se_connecter(dash_duo)
+    ouvrir_le_tableau(dash_duo)
     driver = dash_duo.driver
 
     # Injecte le choix mémorisé comme si l'utilisateur l'avait fait en étant
     # abonné, puis recharge.
     driver.execute_script(f"window.localStorage.setItem('{CLE_LOCALSTORAGE}', 'true');")
     driver.get(f"{dash_duo.server_url}/tableau")
-    _ouvrir_le_tableau(dash_duo)
+    ouvrir_le_tableau(dash_duo)
 
     wrapper = driver.find_element(By.ID, "tableau-mode-wrapper")
     assert "mode-observatoire" not in wrapper.get_attribute("class")

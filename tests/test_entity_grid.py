@@ -13,14 +13,7 @@ from src.utils.entity_grid import (
     grid_type,
 )
 
-
-@pytest.fixture(autouse=True)
-def _sans_abonnement(monkeypatch):
-    """Callbacks appelés hors requête : pas d'utilisateur courant (#97)."""
-    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
-    from src.utils import entity_grid
-
-    monkeypatch.setattr(entity_grid, "current_user_has_subscription", lambda: False)
+pytestmark = pytest.mark.usefixtures("sans_abonnement")
 
 
 def _an_acheteur_id():

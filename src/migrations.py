@@ -194,7 +194,10 @@ def apply_pending() -> None:
                 )
                 conn.execute("COMMIT")
             except BaseException:
-                conn.execute("ROLLBACK")
+                # Une migration qui a clos sa propre transaction ne doit pas
+                # masquer l'erreur d'origine sous un ROLLBACK invalide.
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
                 raise
             continue
         try:

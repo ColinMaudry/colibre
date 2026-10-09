@@ -10,46 +10,7 @@ import pytest
 
 from src.theme import CLAIR, SOMBRE
 
-
-@pytest.fixture(scope="module")
-def flask_app():
-    """Flask app minimale avec SimpleCache pour que @cache.memoize()
-    fonctionne en test (même pattern que tests/test_grid.py)."""
-    from flask import Flask
-
-    from src.utils.cache import cache
-
-    app = Flask(__name__)
-    cache.init_app(app, config={"CACHE_TYPE": "SimpleCache"})
-    return app
-
-
-@pytest.fixture(autouse=True)
-def reset_cache(flask_app):
-    from src.utils.cache import cache
-
-    with flask_app.app_context():
-        try:
-            cache.clear()
-        except (RuntimeError, AttributeError):
-            pass
-        yield
-
-
-@pytest.fixture
-def observatoire_mod():
-    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
-    from src.pages import observatoire
-
-    return observatoire
-
-
-@pytest.fixture
-def tableau_mod():
-    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
-    from src.pages import tableau
-
-    return tableau
+pytestmark = pytest.mark.usefixtures("reset_cache")
 
 
 def _fake_build_dashboard_cards(calls):

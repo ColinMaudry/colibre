@@ -1,13 +1,11 @@
 """Le drapeau `operateurs` (abonné) active la syntaxe booléenne de bout en
 bout : grille, export, et clés des caches mémoïsés des cards (#97)."""
 
+import pytest
+
 from src.theme import CLAIR
-from tests.test_theme_cache import (  # noqa: F401  (fixtures partagées)
-    flask_app,
-    observatoire_mod,
-    reset_cache,
-    tableau_mod,
-)
+
+pytestmark = pytest.mark.usefixtures("reset_cache")
 
 FM = {"objet": {"filterType": "text", "type": "contains", "filter": "test OU zzzznope"}}
 

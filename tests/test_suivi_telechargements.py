@@ -8,17 +8,7 @@ from src.utils.frontend import EXCEL_MAX_ROWS
 from tests.test_entity_grid import _get_download_filtered_callback
 from tests.test_export_format_switch import _UN_FILTRE, _fake_writers, _FakeDF
 
-
-@pytest.fixture(autouse=True)
-def _sans_abonnement(monkeypatch):
-    """Callbacks appelés hors requête : pas d'utilisateur courant (#97)."""
-    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
-    from src.pages import observatoire, tableau
-    from src.utils import entity_grid
-
-    monkeypatch.setattr(observatoire, "current_user_has_subscription", lambda: False)
-    monkeypatch.setattr(tableau, "current_user_has_subscription", lambda: False)
-    monkeypatch.setattr(entity_grid, "current_user_has_subscription", lambda: False)
+pytestmark = pytest.mark.usefixtures("sans_abonnement")
 
 
 @pytest.fixture

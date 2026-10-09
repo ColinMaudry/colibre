@@ -7,8 +7,7 @@ from dash.testing.composite import DashComposite
 from selenium.webdriver import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
-from tests._selenium_compte import ouvrir_le_tableau as _ouvrir_le_tableau
-from tests._selenium_compte import se_connecter as _se_connecter
+from tests._selenium_compte import ouvrir_le_tableau, se_connecter
 from tests.helpers import appels_paq, installer_espion_paq
 
 # Anti-rebond de 3 s des filtres de grille, plus une marge.
@@ -157,8 +156,8 @@ def test_bascule_manuelle_du_mode_envoie_un_evenement(dash_duo: DashComposite):
 
     installer_espion_paq(dash_duo.driver)
     dash_duo.start_server(app)
-    _se_connecter(dash_duo)
-    _ouvrir_le_tableau(dash_duo)
+    se_connecter(dash_duo)
+    ouvrir_le_tableau(dash_duo)
     dash_duo.find_element("#tableau-mode-observatoire").click()
     WebDriverWait(dash_duo.driver, 4).until(lambda d: _evenements(dash_duo, "mode"))
     assert _evenements(dash_duo, "mode") == [
@@ -193,7 +192,7 @@ def test_deplacement_d_une_tuile_envoie_un_evenement(dash_duo: DashComposite):
     # Le drag & drop n'est armé que sur un écran d'au moins 768 px de large.
     dash_duo.driver.set_window_size(1400, 1000)
     dash_duo.start_server(app)
-    _se_connecter(dash_duo)
+    se_connecter(dash_duo)
     dash_duo.wait_for_page(f"{dash_duo.server_url}/observatoire")
     dash_duo.wait_for_element("[data-observatoire-cards]", timeout=20)
     WebDriverWait(dash_duo.driver, 10).until(

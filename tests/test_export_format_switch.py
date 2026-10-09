@@ -18,14 +18,7 @@ from src.utils.frontend import EXCEL_MAX_ROWS
 _UN_FILTRE = {"objet": {"filterType": "text", "type": "contains", "filter": "voirie"}}
 
 
-@pytest.fixture(autouse=True)
-def _sans_abonnement(monkeypatch):
-    """Callbacks appelés hors requête : pas d'utilisateur courant (#97)."""
-    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
-    from src.pages import observatoire, tableau
-
-    monkeypatch.setattr(tableau, "current_user_has_subscription", lambda: False)
-    monkeypatch.setattr(observatoire, "current_user_has_subscription", lambda: False)
+pytestmark = pytest.mark.usefixtures("sans_abonnement")
 
 
 class _FakeDF:

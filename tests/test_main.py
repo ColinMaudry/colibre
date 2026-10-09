@@ -109,9 +109,8 @@ def test_002_filter_persistence(dash_duo: DashComposite):
         assert filter_input.get_attribute("value") == "zzz_no_match"
 
 
-def test_003_tableau_download(dash_duo: DashComposite, monkeypatch):
+def test_003_tableau_download(dash_duo: DashComposite, monkeypatch, sans_abonnement):
     from src.app import app
-    from src.pages import acheteur, tableau, titulaire
     from src.pages.acheteur import download_acheteur_data
     from src.pages.tableau import download_data
     from src.pages.titulaire import download_titulaire_data
@@ -123,9 +122,7 @@ def test_003_tableau_download(dash_duo: DashComposite, monkeypatch):
     # événement de suivi (set_props) n'a pas de callback où s'écrire (#149).
     monkeypatch.setattr("src.utils.suivi.set_props", lambda *a, **kw: None)
     # Hors requête, current_user vaut None : les exports compilent les filtres
-    # texte selon l'abonnement (#97), on fixe donc ce drapeau.
-    for page in (tableau, acheteur, titulaire):
-        monkeypatch.setattr(page, "current_user_has_subscription", lambda: False)
+    # texte selon l'abonnement (#97), d'où la fixture `sans_abonnement`.
 
     # /tableau : sans filtre, le bouton renvoie désormais vers le CSV complet
     # de data.gouv.fr au lieu de générer un fichier (#142) — un filterModel

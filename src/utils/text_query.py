@@ -286,7 +286,9 @@ def _normaliser_blancs(saisie: str) -> str:
     morceaux = saisie.split('"')
     for i in range(0, len(morceaux), 2):
         morceaux[i] = re.sub(r"\s+", " ", morceaux[i])
-    return '"'.join(morceaux).strip()
+    texte = '"'.join(morceaux).lstrip()
+    # Nombre impair de morceaux : le dernier est hors guillemets.
+    return texte.rstrip() if len(morceaux) % 2 else texte
 
 
 def en_texte(expression: Expression) -> str:

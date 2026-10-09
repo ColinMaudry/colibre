@@ -17,13 +17,7 @@ _MESSAGE_DATA_GOUV = (
 )
 
 
-@pytest.fixture(autouse=True)
-def _sans_abonnement(monkeypatch):
-    """Callbacks appelés hors requête : pas d'utilisateur courant (#97)."""
-    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
-    from src.pages import tableau
-
-    monkeypatch.setattr(tableau, "current_user_has_subscription", lambda: False)
+pytestmark = pytest.mark.usefixtures("sans_abonnement")
 
 
 def test_update_meta_excel_sous_le_seuil():

@@ -238,6 +238,7 @@ def test_ne_contient_pas_inclut_null_et_vide(con_booleens):
     resultat = _filtre(con_booleens, "construction", negation=True)
     assert None in resultat
     assert "" in resultat
+    assert "Travaux de construction" not in resultat
 
 
 def test_expression_vide_garde_seulement(con_booleens):
@@ -258,3 +259,7 @@ def test_valeur_liee(con_booleens):
 def test_en_texte_garde_blancs_dans_phrase(operateurs):
     saisie = '  "maintenance   sur"   site '
     assert en_texte(analyser(saisie, operateurs)) == '"maintenance   sur" site'
+
+
+def test_en_texte_garde_blancs_finaux_d_une_phrase_ouverte():
+    assert en_texte(analyser('a "foo   ', False)) == 'a "foo   '

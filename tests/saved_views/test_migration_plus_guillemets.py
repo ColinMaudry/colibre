@@ -176,3 +176,22 @@ def test_migration_en_echec_annulee(users_db_path, monkeypatch):
 
     assert _query(view_id) == avant
     assert "9999_en_echec" not in _ids_appliques()
+
+
+def test_migration_qui_clot_sa_transaction_garde_l_erreur(users_db_path, monkeypatch):
+    apply_pending()
+
+    def migration_qui_commite(conn):
+        conn.execute("COMMIT")
+        raise ValueError("erreur d'origine")
+
+    monkeypatch.setattr(
+        migrations,
+        "_MIGRATIONS",
+        [*migrations._MIGRATIONS, ("9998_commit_puis_echec", migration_qui_commite)],
+    )
+
+    with pytest.raises(ValueError, match="erreur d'origine"):
+        apply_pending()
+
+    assert "9998_commit_puis_echec" not in _ids_appliques()
