@@ -143,7 +143,9 @@ Les jokers `%` et `_` de `LIKE` saisis par l'utilisateur ne sont pas échappés
 #### Réparations (abonnés)
 
 L'analyseur ne rejette jamais une saisie. Il la répare et note chaque
-correction par un libellé court :
+correction par un libellé court. Pour un non-abonné, les guillemets sont
+réparés de la même façon (fermés en fin de saisie, `""` ignorés) mais sans
+correction notée : sa pastille reste neutre.
 
 | Cas                                                                                    | Réparation                                             | Libellé                        |
 | -------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------ |
@@ -161,6 +163,10 @@ du jeton en cause (pour une parenthèse manquante : la `(` non fermée). La
 limite d'imbrication protège l'analyseur récursif (limite de récursion
 Python : 1 000).
 
+Une paire vide dont la `)` a été ajoutée par réparation (`béton (`) ne
+produit que « parenthèse manquante », pas « parenthèses vides ». Une phrase
+qui ne contient que des blancs (`" "`) est traitée comme `""`.
+
 Exemples :
 
 | Saisie             | Expression appliquée    | Corrections                       |
@@ -174,8 +180,11 @@ Exemples :
 
 ### 2. Module `src/utils/text_query.py` (nouveau)
 
-Dépend seulement de `normalize_text_term` et `text_filter_target`
-(`src/utils/table_sql.py`).
+Dépend seulement de `src/utils/text_normalization.py` et de `unidecode`.
+`normalize_text_term`, `text_filter_target` et `_ACCENT_INSENSITIVE_COLUMNS`
+y sont déplacés depuis `src/utils/table_sql.py` : `table_sql` importe
+`text_query` (filtre Objet de l'observatoire), l'inverse créerait un import
+circulaire. `query_ast` les importe désormais depuis `text_query`.
 
 - Arbre privé : `Mot(texte)`, `Phrase(texte)`, `Et(enfants)`, `Ou(enfants)`,
   `Pas(enfant)`.
@@ -244,9 +253,11 @@ Dépend seulement de `normalize_text_term` et `text_filter_target`
   - `[ Objet contient béton (OU orphelin) ou contient brique × ]` (deux
     conditions AG Grid reliées par OU)
 - Bandeau non-abonné : si une condition a `operateurs_ignores`, le même
-  callback ajoute à la suite des pastilles un `dbc.Alert` de couleur
-  `warning`, compact : « Les opérateurs OU, ET, PAS et les parenthèses sont
-  réservés aux abonné·es. [S'abonner](/projet/abonnement) ». Couvre
+  callback ajoute à la suite des pastilles un `html.Span` (classe
+  `filter-pills-banniere`, couleurs d'avertissement ; un `div` comme
+  `dbc.Alert` serait invalide dans le `span` des pastilles) : « Les
+  opérateurs OU, ET, PAS et les parenthèses sont réservés aux abonné·es.
+  [S'abonner](/projet/abonnement) ». Couvre
   `/tableau`, acheteur et titulaire sans nouvel identifiant de layout. La
   pastille d'un non-abonné affiche la saisie telle quelle, sans classe
   d'avertissement.
@@ -293,12 +304,15 @@ bandeau.
 
 - `_MIGRATIONS` devient `list[tuple[str, str | Callable[[sqlite3.Connection], None]]]`.
   `apply_pending` exécute le SQL comme aujourd'hui, ou appelle la fonction
-  avec la connexion, dans la même transaction, puis enregistre l'id dans
-  `schema_migrations`.
+  avec la connexion entre un `BEGIN` et un `COMMIT` explicites (`get_conn`
+  est en autocommit), avec l'enregistrement de l'id dans `schema_migrations`
+  ; en cas d'erreur, `ROLLBACK` puis l'exception remonte.
 - Migration `0017_saved_views_plus_vers_guillemets` : pour chaque ligne de
   `saved_views`, lit `query` (JSON), parcourt `ast` et réécrit la `value` des
   nœuds `{"t": "cond"}` dont l'`operator` est `contains` ou `notContains` et
   la valeur une chaîne. N'écrit la ligne que si elle change.
+  Une `query` qui n'est pas du JSON, ou sans clé `ast` (anciennes vues, que
+  `saved_views/resolve.py` tolère déjà), est laissée telle quelle.
 - Règle de réécriture, mot par mot (découpage sur les blancs) :
   - un mot contenant `+` devient une phrase : `maitrise+d'oeuvre` →
     `"maitrise d'oeuvre"` ;
