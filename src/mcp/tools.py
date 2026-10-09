@@ -82,7 +82,8 @@ def rechercher_marches(
 
     Filtres nommés : acheteur_id, titulaire_id, cpv (code CPV, filtre par
     préfixe — ex. « 72 » = informatique, « 7220 » = logiciels),
-    objet_contient (texte de l'objet), montant_min, montant_max,
+    objet_contient (texte de l'objet, insensible à la casse, aux accents, aux
+    ligatures œ/æ et à l'apostrophe typographique), montant_min, montant_max,
     date_min / date_max (format YYYY-MM-DD, sur dateNotification),
     departement (code département de l'acheteur).
     filtres_avances : dict optionnel {"colonne__operateur": valeur} pour les
