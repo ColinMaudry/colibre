@@ -252,3 +252,9 @@ def test_non_abonne_mots_ordinaires(con_booleens):
 
 def test_valeur_liee(con_booleens):
     assert _filtre(con_booleens, "x' OR 1=1 --") == ["x' OR 1=1 --"]
+
+
+@pytest.mark.parametrize("operateurs", [True, False])
+def test_en_texte_garde_blancs_dans_phrase(operateurs):
+    saisie = '  "maintenance   sur"   site '
+    assert en_texte(analyser(saisie, operateurs)) == '"maintenance   sur" site'

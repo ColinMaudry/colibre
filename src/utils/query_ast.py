@@ -1,9 +1,11 @@
 """Représentation canonique d'un filtre (AST booléen) et compilation en SQL DuckDB.
 
-Ce module est indépendant de l'UI : plusieurs producteurs (filtres de colonne
-AG Grid, syntaxe booléenne #97, portée par la valeur des conditions `contains`
-(voir `src/utils/text_query.py`)) construisent le même AST, compilé
-ici en SQL paramétré. Les identifiants de colonnes sont validés contre le schéma ;
+Ce module est indépendant de l'UI : les filtres de colonne AG Grid
+(`filtermodel_to_ast`) et les vues sauvegardées (`ast_from_dict`) construisent
+le même AST, compilé ici en SQL paramétré. La syntaxe booléenne #97 n'est pas
+un producteur d'AST : elle vit dans `Condition.value` des conditions
+`contains`/`notContains` et est compilée par `src/utils/text_query.py`.
+Les identifiants de colonnes sont validés contre le schéma ;
 les valeurs passent toujours par le binding `?` (jamais concaténées).
 """
 

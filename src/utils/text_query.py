@@ -5,6 +5,7 @@ parenthèses et phrases entre guillemets. La saisie est toujours réparée :
 `analyser` ne lève jamais d'erreur et note les corrections appliquées.
 """
 
+import re
 from dataclasses import dataclass, field
 
 from unidecode import unidecode
@@ -278,11 +279,21 @@ def _rendre(noeud, parent=None) -> str:
     return f"({texte})" if parent is Pas else texte
 
 
+def _normaliser_blancs(saisie: str) -> str:
+    """Réduit les suites de blancs hors guillemets ; le contenu d'une phrase
+    (jusqu'à la fin de la saisie si le guillemet n'est pas fermé, comme le
+    lexer) reste littéral, à l'image du SQL appliqué."""
+    morceaux = saisie.split('"')
+    for i in range(0, len(morceaux), 2):
+        morceaux[i] = re.sub(r"\s+", " ", morceaux[i])
+    return '"'.join(morceaux).strip()
+
+
 def en_texte(expression: Expression) -> str:
-    """Saisie telle quelle (blancs normalisés) si rien n'a été corrigé, sinon
-    forme canonique de l'arbre réparé."""
+    """Saisie telle quelle (blancs normalisés hors guillemets) si rien n'a été
+    corrigé, sinon forme canonique de l'arbre réparé."""
     if not expression.corrections:
-        return " ".join(expression.saisie.split())
+        return _normaliser_blancs(expression.saisie)
     if expression.arbre is None:
         return ""
     return _rendre(expression.arbre)
