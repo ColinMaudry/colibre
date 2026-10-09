@@ -58,7 +58,7 @@ def test_le_filtre_d_identifiant_passe_par_le_chemin_serveur():
         {"acheteur_id": {"filterType": "text", "type": "equals", "filter": "123"}},
         schema,
     )
-    sql, params = ast_to_sql(ast, schema)
+    sql, params = ast_to_sql(ast, schema, operateurs=False)
     assert "acheteur_id" in sql
     assert params == ["123"]
 

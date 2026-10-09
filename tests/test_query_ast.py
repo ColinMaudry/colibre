@@ -26,7 +26,7 @@ SCHEMA = pl.Schema(
 
 def _run(node):
     """Compile et retourne (sql, params)."""
-    return ast_to_sql(node, SCHEMA)
+    return ast_to_sql(node, SCHEMA, operateurs=True)
 
 
 def test_none_is_true():
@@ -50,7 +50,7 @@ def test_text_contains_multiword_is_and():
 
 
 def test_text_contains_wildcard_and_phrase():
-    _, params = _run(Condition("objet", "contains", "distri* metropole+rennes"))
+    _, params = _run(Condition("objet", "contains", 'distri* "metropole rennes"'))
     assert params == ["distri%", "%metropole rennes%"]
 
 
@@ -150,13 +150,13 @@ def test_filtermodel_empty_is_none():
 
 def test_filtermodel_text_contains():
     fm = {"objet": {"filterType": "text", "type": "contains", "filter": "voirie"}}
-    _, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA)
+    _, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA, operateurs=True)
     assert params == ["%voirie%"]
 
 
 def test_filtermodel_number_greaterthan():
     fm = {"montant": {"filterType": "number", "type": "greaterThan", "filter": 40000}}
-    sql, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA)
+    sql, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA, operateurs=True)
     assert '"montant"' in sql and params == [40000.0]
 
 
@@ -169,7 +169,7 @@ def test_filtermodel_number_inrange():
             "filterTo": 200,
         }
     }
-    _, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA)
+    _, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA, operateurs=True)
     assert params == [100.0, 200.0]
 
 
@@ -181,7 +181,7 @@ def test_filtermodel_date_uses_datefrom():
             "dateFrom": "2022-01-01",
         }
     }
-    _, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA)
+    _, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA, operateurs=True)
     assert params == ["2022-01-01"]
 
 
@@ -198,7 +198,7 @@ def test_filtermodel_two_conditions_or():
             },
         }
     }
-    sql, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA)
+    sql, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA, operateurs=True)
     assert " OR " in sql and params == ["%beton%", "%ciment%"]
 
 
@@ -219,7 +219,7 @@ def test_filtermodel_two_conditions_or_real_ag_grid_shape():
     }
     ast = filtermodel_to_ast(fm, SCHEMA)
     assert ast is not None, "le filtre ne doit pas être silencieusement ignoré"
-    sql, params = ast_to_sql(ast, SCHEMA)
+    sql, params = ast_to_sql(ast, SCHEMA, operateurs=True)
     assert " OR " in sql
     assert params == ["%91%", "%78%"]
 
@@ -238,7 +238,7 @@ def test_filtermodel_conditions_and_three_values():
         }
     }
     ast = filtermodel_to_ast(fm, SCHEMA)
-    sql, params = ast_to_sql(ast, SCHEMA)
+    sql, params = ast_to_sql(ast, SCHEMA, operateurs=True)
     assert sql.count(" AND ") >= 2
     assert params == ["%voirie%", "%reparation%", "%route%"]
 
@@ -248,7 +248,7 @@ def test_filtermodel_multiple_columns_are_anded():
         "objet": {"filterType": "text", "type": "contains", "filter": "voirie"},
         "montant": {"filterType": "number", "type": "greaterThan", "filter": 1000},
     }
-    sql, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA)
+    sql, params = ast_to_sql(filtermodel_to_ast(fm, SCHEMA), SCHEMA, operateurs=True)
     assert " AND " in sql and set(params) == {"%voirie%", 1000.0}
 
 
@@ -271,7 +271,9 @@ def test_ast_dict_roundtrip():
         ]
     )
     restored = ast_from_dict(ast_to_dict(node))
-    assert ast_to_sql(restored, SCHEMA) == ast_to_sql(node, SCHEMA)
+    assert ast_to_sql(restored, SCHEMA, operateurs=True) == ast_to_sql(
+        node, SCHEMA, operateurs=True
+    )
 
 
 def test_ast_dict_none():
@@ -286,7 +288,9 @@ def _roundtrip_sql(fm):
     ast1 = filtermodel_to_ast(fm, SCHEMA)
     rebuilt_fm = ast_to_filtermodel(ast1, SCHEMA)
     ast2 = filtermodel_to_ast(rebuilt_fm, SCHEMA)
-    return ast_to_sql(ast1, SCHEMA), ast_to_sql(ast2, SCHEMA)
+    return ast_to_sql(ast1, SCHEMA, operateurs=True), ast_to_sql(
+        ast2, SCHEMA, operateurs=True
+    )
 
 
 def test_ast_to_filtermodel_roundtrip_text_contains():

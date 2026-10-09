@@ -1,7 +1,8 @@
 """Représentation canonique d'un filtre (AST booléen) et compilation en SQL DuckDB.
 
 Ce module est indépendant de l'UI : plusieurs producteurs (filtres de colonne
-AG Grid, futur champ de requête booléenne #97) construisent le même AST, compilé
+AG Grid, syntaxe booléenne #97, portée par la valeur des conditions `contains`
+(voir `src/utils/text_query.py`)) construisent le même AST, compilé
 ici en SQL paramétré. Les identifiants de colonnes sont validés contre le schéma ;
 les valeurs passent toujours par le binding `?` (jamais concaténées).
 """
@@ -11,8 +12,13 @@ from dataclasses import dataclass
 import polars as pl
 
 from src.utils import logger
-from src.utils.table_sql import sort_by_to_sql, tokenize_text_filter
-from src.utils.text_query import normalize_text_term, text_filter_target
+from src.utils.table_sql import sort_by_to_sql
+from src.utils.text_query import (
+    analyser,
+    en_sql,
+    normalize_text_term,
+    text_filter_target,
+)
 
 
 @dataclass
@@ -41,30 +47,32 @@ class Not:
 Node = object  # Condition | And | Or | Not | None
 
 
-def ast_to_sql(node, schema: pl.Schema) -> tuple[str, list]:
+def ast_to_sql(node, schema: pl.Schema, *, operateurs: bool) -> tuple[str, list]:
     """Compile un AST en (where_sql, params). Nœud neutre -> ('TRUE', [])."""
     if node is None:
         return "TRUE", []
     if isinstance(node, And):
-        return _join(node.children, "AND", schema)
+        return _join(node.children, "AND", schema, operateurs=operateurs)
     if isinstance(node, Or):
-        return _join(node.children, "OR", schema)
+        return _join(node.children, "OR", schema, operateurs=operateurs)
     if isinstance(node, Not):
-        sql, params = ast_to_sql(node.child, schema)
+        sql, params = ast_to_sql(node.child, schema, operateurs=operateurs)
         if sql == "TRUE":
             return "TRUE", []
         return f"NOT ({sql})", params
     if isinstance(node, Condition):
-        return _condition_to_sql(node, schema)
+        return _condition_to_sql(node, schema, operateurs=operateurs)
     logger.warning(f"Nœud AST inconnu ignoré : {node!r}")
     return "TRUE", []
 
 
-def _join(children, op: str, schema: pl.Schema) -> tuple[str, list]:
+def _join(
+    children, op: str, schema: pl.Schema, *, operateurs: bool
+) -> tuple[str, list]:
     fragments: list[str] = []
     params: list = []
     for child in children:
-        sql, child_params = ast_to_sql(child, schema)
+        sql, child_params = ast_to_sql(child, schema, operateurs=operateurs)
         if sql == "TRUE":
             continue
         fragments.append(f"({sql})")
@@ -74,7 +82,9 @@ def _join(children, op: str, schema: pl.Schema) -> tuple[str, list]:
     return f" {op} ".join(fragments), params
 
 
-def _condition_to_sql(cond: Condition, schema: pl.Schema) -> tuple[str, list]:
+def _condition_to_sql(
+    cond: Condition, schema: pl.Schema, *, operateurs: bool
+) -> tuple[str, list]:
     col = cond.column
     if col not in schema.names():
         logger.warning(f"Colonne inconnue ignorée : {col!r}")
@@ -100,9 +110,9 @@ def _condition_to_sql(cond: Condition, schema: pl.Schema) -> tuple[str, list]:
 
     # texte / date : traité comme texte (parité avec l'existant)
     if cond.operator == "contains":
-        return tokenize_text_filter(col, str(cond.value), col_is_date)
+        return en_sql(analyser(str(cond.value), operateurs), col, col_is_date)
     if cond.operator == "notContains":
-        where, params = tokenize_text_filter(col, str(cond.value), col_is_date)
+        where, params = en_sql(analyser(str(cond.value), operateurs), col, col_is_date)
         return f"NOT ({where})", params
 
     target = f"CAST({quoted} AS VARCHAR)" if col_is_date else quoted

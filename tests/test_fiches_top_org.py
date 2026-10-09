@@ -84,13 +84,14 @@ def test_le_datasource_est_scope_a_la_fiche(
 
     recu = {}
 
-    def faux_fetch(org, where_sql, params, request, extra_columns=()):
+    def faux_fetch(org, where_sql, params, request, extra_columns=(), *, operateurs):
         recu.update(
             org=org, where_sql=where_sql, params=params, extra=list(extra_columns)
         )
         return {"rowData": [], "rowCount": 0}
 
     monkeypatch.setattr(page, "fetch_top_org_page", faux_fetch)
+    monkeypatch.setattr(page, "current_user_has_subscription", lambda: False)
 
     request = {"startRow": 0, "endRow": 10, "filterModel": None, "sortModel": None}
     getattr(page, fonction)(request, "/x/123", None)

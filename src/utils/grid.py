@@ -35,10 +35,12 @@ def fetch_grid_page(
     end_row: int,
     base_where_sql: str = "TRUE",
     base_params: tuple = (),
+    *,
+    operateurs: bool,
 ) -> tuple[list[dict], int, int]:
     """Renvoie (row_data, total_count, total_unique_count) pour un bloc [start_row, end_row)."""
     ast = filtermodel_to_ast(filter_model, schema)
-    filter_sql, filter_params = ast_to_sql(ast, schema)
+    filter_sql, filter_params = ast_to_sql(ast, schema, operateurs=operateurs)
     where_sql = f"({base_where_sql}) AND ({filter_sql})"
     params = [*base_params, *filter_params]
 
@@ -73,6 +75,8 @@ def export_dataframe(
     hidden_columns,
     base_where_sql: str = "TRUE",
     base_params: tuple = (),
+    *,
+    operateurs: bool,
 ) -> pl.DataFrame:
     """Renvoie les lignes filtrées/triées pour l'export Excel.
 
@@ -82,7 +86,7 @@ def export_dataframe(
     `fetch_grid_page`. Par défaut `TRUE` → comportement inchangé pour tableau.py.
     """
     ast = filtermodel_to_ast(filter_model, schema)
-    filter_sql, filter_params = ast_to_sql(ast, schema)
+    filter_sql, filter_params = ast_to_sql(ast, schema, operateurs=operateurs)
     where_sql = f"({base_where_sql}) AND ({filter_sql})"
     params = [*base_params, *filter_params]
     order_by = sort_model_to_sql(sort_model, schema) or None

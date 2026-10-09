@@ -13,6 +13,15 @@ import pytest
 from tests.helpers import walk_components
 
 
+@pytest.fixture(autouse=True)
+def _sans_abonnement(monkeypatch):
+    """Callbacks appelés hors requête : pas d'utilisateur courant (#97)."""
+    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
+    from src.pages import observatoire
+
+    monkeypatch.setattr(observatoire, "current_user_has_subscription", lambda: False)
+
+
 def _layout_nodes():
     from src.app import app  # noqa: F401  (instancie Dash avant les pages)
     from src.pages import observatoire

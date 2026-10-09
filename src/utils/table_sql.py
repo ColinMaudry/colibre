@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import polars as pl
 
 from src.utils import logger
-from src.utils.text_query import normalize_text_term, text_filter_target
+from src.utils.text_query import analyser, en_sql
 
 
 def sort_by_to_sql(sort_by: list[dict] | None, schema: pl.Schema) -> str:
@@ -47,6 +47,8 @@ def dashboard_filters_to_sql(
     dashboard_marche_sous_traitance_declaree=None,
     dashboard_montant_min=None,
     dashboard_montant_max=None,
+    *,
+    operateurs: bool,
 ) -> tuple[str, list]:
     """Traduit les filtres du tableau de bord en (where_clause, params) DuckDB."""
     clauses: list[str] = []
@@ -90,7 +92,9 @@ def dashboard_filters_to_sql(
         params.append(dashboard_marche_type)
 
     if dashboard_marche_objet:
-        where_clause, param_list = tokenize_text_filter("objet", dashboard_marche_objet)
+        where_clause, param_list = en_sql(
+            analyser(dashboard_marche_objet, operateurs), "objet"
+        )
         clauses.append(where_clause)
         params.extend(param_list)
 
@@ -141,33 +145,3 @@ def dashboard_filters_to_sql(
         params.append(dashboard_montant_max)
 
     return " AND ".join(clauses), params
-
-
-def tokenize_text_filter(
-    column: str, text: str, col_is_date: bool = False
-) -> tuple[str, list]:
-    terms = text.split()
-    # si col_is_date alors le deuxième doit être casté en VARCHAR
-    if col_is_date:
-        quoted_col = f'CAST("{column}" AS VARCHAR)'
-    else:
-        quoted_col = f'"{column}"'
-
-    conditions = [f'"{column}" IS NOT NULL', f"{quoted_col} <> ''"]
-    target = text_filter_target(column, quoted_col)
-
-    params = []
-
-    for term in terms:
-        term = normalize_text_term(column, term)
-        conditions.append(f"{target} ILIKE ?")
-
-        if term.startswith("*") or term.endswith("*"):
-            params.append(term.replace("*", "%"))
-        elif "+" in term:
-            params.append(f"%{term.replace('+', ' ')}%")
-        else:
-            params.append(f"%{term}%")
-
-    where_clause = " AND ".join(conditions)
-    return where_clause, params

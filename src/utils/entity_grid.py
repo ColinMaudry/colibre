@@ -28,6 +28,7 @@ from src.figures import (
     AG_GRID_LOCALE_FR,  # noqa: F401  (réexport pratique)
     ag_grid,
 )
+from src.pages._compte_shell import current_user_has_subscription
 from src.utils.filter_pills import register_filter_pills_callbacks
 from src.utils.grid import (
     apply_persisted_layout,
@@ -75,7 +76,7 @@ def entity_grid_column_defs(hidden_columns, column_state) -> list[dict]:
     return apply_persisted_layout(defs, column_state)
 
 
-def fetch_entity_page(org_type, entity_id, year, request) -> tuple:
+def fetch_entity_page(org_type, entity_id, year, request, *, operateurs: bool) -> tuple:
     """Datasource server-side scopé pour la grille entité.
 
     Renvoie ({"rowData": ..., "rowCount": total}, total, total_unique).
@@ -90,11 +91,14 @@ def fetch_entity_page(org_type, entity_id, year, request) -> tuple:
         request.get("endRow", 100),
         base_where_sql=base_where_sql,
         base_params=tuple(base_params),
+        operateurs=operateurs,
     )
     return {"rowData": rows, "rowCount": total}, total, total_unique
 
 
-def export_entity_dataframe(org_type, entity_id, year, filter_model, column_state):
+def export_entity_dataframe(
+    org_type, entity_id, year, filter_model, column_state, *, operateurs: bool
+):
     """DataFrame filtré/trié (état courant de la grille) pour l'export Excel."""
     base_where_sql, base_params = entity_scope(org_type, entity_id, year)
     sort_model = _sort_model_from_column_state(column_state)
@@ -105,6 +109,7 @@ def export_entity_dataframe(org_type, entity_id, year, filter_model, column_stat
         hidden_columns,
         base_where_sql=base_where_sql,
         base_params=tuple(base_params),
+        operateurs=operateurs,
     )
 
 
@@ -160,7 +165,11 @@ def register_entity_grid_callbacks(org_type: str) -> None:
         if request is None or gid is None:
             return no_update
         response, total, total_unique = fetch_entity_page(
-            org_type, gid["entity_id"], gid["year"], request
+            org_type,
+            gid["entity_id"],
+            gid["year"],
+            request,
+            operateurs=current_user_has_subscription(),
         )
         set_props(f"{org_type}-total", {"data": total})
         set_props(f"{org_type}-total-unique", {"data": total_unique})
@@ -258,7 +267,12 @@ def register_entity_grid_callbacks(org_type: str) -> None:
         filter_model = (filter_models or [None])[0]
         column_state = (column_states or [None])[0]
         df = export_entity_dataframe(
-            org_type, entity_id, year, filter_model, column_state
+            org_type,
+            entity_id,
+            year,
+            filter_model,
+            column_state,
+            operateurs=current_user_has_subscription(),
         )
 
         if df.height > EXCEL_MAX_ROWS:

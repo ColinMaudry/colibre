@@ -1,4 +1,5 @@
 import dash_ag_grid as dag
+import pytest
 
 import src.app  # noqa: F401  # instancie l'app → schema chargé
 from src.db import query_marches
@@ -11,6 +12,15 @@ from src.utils.entity_grid import (
     fetch_entity_page,
     grid_type,
 )
+
+
+@pytest.fixture(autouse=True)
+def _sans_abonnement(monkeypatch):
+    """Callbacks appelés hors requête : pas d'utilisateur courant (#97)."""
+    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
+    from src.utils import entity_grid
+
+    monkeypatch.setattr(entity_grid, "current_user_has_subscription", lambda: False)
 
 
 def _an_acheteur_id():
@@ -45,7 +55,9 @@ def test_entity_scope_toutes_les_annees_no_year_filter():
 def test_fetch_entity_page_is_scoped():
     ach = _an_acheteur_id()
     request = {"startRow": 0, "endRow": 50, "filterModel": None, "sortModel": None}
-    response, total, total_unique = fetch_entity_page("acheteur", ach, None, request)
+    response, total, total_unique = fetch_entity_page(
+        "acheteur", ach, None, request, operateurs=False
+    )
     assert total > 0
     assert total_unique > 0
     assert response["rowCount"] == total
@@ -57,13 +69,13 @@ def test_fetch_entity_page_is_scoped():
 def test_fetch_entity_page_none_request():
     from dash import no_update
 
-    out = fetch_entity_page("acheteur", "S123", None, None)
+    out = fetch_entity_page("acheteur", "S123", None, None, operateurs=False)
     assert out == (no_update, no_update, no_update)
 
 
 def test_export_entity_dataframe_scoped():
     ach = _an_acheteur_id()
-    df = export_entity_dataframe("acheteur", ach, None, None, None)
+    df = export_entity_dataframe("acheteur", ach, None, None, None, operateurs=False)
     assert df.height > 0
     assert set(df["acheteur_id"].to_list()) == {ach}
 

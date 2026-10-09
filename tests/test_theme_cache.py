@@ -73,8 +73,8 @@ def test_observatoire_meme_theme_meme_filtre_un_seul_calcul(
     )
 
     filtres = (("acheteur_nom", "ACME"),)
-    r1 = observatoire_mod._compute_dashboard_children(filtres, CLAIR)
-    r2 = observatoire_mod._compute_dashboard_children(filtres, CLAIR)
+    r1 = observatoire_mod._compute_dashboard_children(filtres, CLAIR, False)
+    r2 = observatoire_mod._compute_dashboard_children(filtres, CLAIR, False)
 
     assert len(calls) == 1
     assert r1 == r2 == "cards-clair"
@@ -92,8 +92,8 @@ def test_observatoire_changement_de_theme_meme_filtre_deux_calculs(
     )
 
     filtres = (("acheteur_nom", "ACME"),)
-    r_clair = observatoire_mod._compute_dashboard_children(filtres, CLAIR)
-    r_sombre = observatoire_mod._compute_dashboard_children(filtres, SOMBRE)
+    r_clair = observatoire_mod._compute_dashboard_children(filtres, CLAIR, False)
+    r_sombre = observatoire_mod._compute_dashboard_children(filtres, SOMBRE, False)
 
     assert len(calls) == 2
     assert r_clair == "cards-clair"
@@ -112,7 +112,7 @@ def test_observatoire_build_dashboard_cards_recoit_le_theme(
     )
 
     filtres = (("acheteur_nom", "ACME"),)
-    observatoire_mod._compute_dashboard_children(filtres, SOMBRE)
+    observatoire_mod._compute_dashboard_children(filtres, SOMBRE, False)
 
     assert calls[-1]["theme"] == SOMBRE
 
@@ -120,7 +120,9 @@ def test_observatoire_build_dashboard_cards_recoit_le_theme(
 def test_tableau_meme_theme_meme_filtre_un_seul_calcul(tableau_mod, monkeypatch):
     calls = []
     monkeypatch.setattr(tableau_mod, "filtermodel_to_ast", lambda fm, schema: "ast")
-    monkeypatch.setattr(tableau_mod, "ast_to_sql", lambda ast, schema: ("1=1", []))
+    monkeypatch.setattr(
+        tableau_mod, "ast_to_sql", lambda ast, schema, *, operateurs: ("1=1", [])
+    )
     monkeypatch.setattr(tableau_mod, "query_marches", lambda **kw: "dff-stub")
     monkeypatch.setattr(
         tableau_mod, "build_dashboard_cards", _fake_build_dashboard_cards(calls)
@@ -129,8 +131,8 @@ def test_tableau_meme_theme_meme_filtre_un_seul_calcul(tableau_mod, monkeypatch)
     filtre_json = tableau_mod._normalize_filter_model(
         {"acheteur_nom": {"filterType": "text", "type": "contains", "filter": "ACME"}}
     )
-    r1 = tableau_mod._cards_pour_filtre(filtre_json, CLAIR)
-    r2 = tableau_mod._cards_pour_filtre(filtre_json, CLAIR)
+    r1 = tableau_mod._cards_pour_filtre(filtre_json, CLAIR, False)
+    r2 = tableau_mod._cards_pour_filtre(filtre_json, CLAIR, False)
 
     assert len(calls) == 1
     assert r1 == r2 == "cards-clair"
@@ -139,7 +141,9 @@ def test_tableau_meme_theme_meme_filtre_un_seul_calcul(tableau_mod, monkeypatch)
 def test_tableau_changement_de_theme_meme_filtre_deux_calculs(tableau_mod, monkeypatch):
     calls = []
     monkeypatch.setattr(tableau_mod, "filtermodel_to_ast", lambda fm, schema: "ast")
-    monkeypatch.setattr(tableau_mod, "ast_to_sql", lambda ast, schema: ("1=1", []))
+    monkeypatch.setattr(
+        tableau_mod, "ast_to_sql", lambda ast, schema, *, operateurs: ("1=1", [])
+    )
     monkeypatch.setattr(tableau_mod, "query_marches", lambda **kw: "dff-stub")
     monkeypatch.setattr(
         tableau_mod, "build_dashboard_cards", _fake_build_dashboard_cards(calls)
@@ -148,8 +152,8 @@ def test_tableau_changement_de_theme_meme_filtre_deux_calculs(tableau_mod, monke
     filtre_json = tableau_mod._normalize_filter_model(
         {"acheteur_nom": {"filterType": "text", "type": "contains", "filter": "ACME"}}
     )
-    r_clair = tableau_mod._cards_pour_filtre(filtre_json, CLAIR)
-    r_sombre = tableau_mod._cards_pour_filtre(filtre_json, SOMBRE)
+    r_clair = tableau_mod._cards_pour_filtre(filtre_json, CLAIR, False)
+    r_sombre = tableau_mod._cards_pour_filtre(filtre_json, SOMBRE, False)
 
     assert len(calls) == 2
     assert r_clair == "cards-clair"
@@ -159,7 +163,9 @@ def test_tableau_changement_de_theme_meme_filtre_deux_calculs(tableau_mod, monke
 def test_tableau_build_dashboard_cards_recoit_le_theme(tableau_mod, monkeypatch):
     calls = []
     monkeypatch.setattr(tableau_mod, "filtermodel_to_ast", lambda fm, schema: "ast")
-    monkeypatch.setattr(tableau_mod, "ast_to_sql", lambda ast, schema: ("1=1", []))
+    monkeypatch.setattr(
+        tableau_mod, "ast_to_sql", lambda ast, schema, *, operateurs: ("1=1", [])
+    )
     monkeypatch.setattr(tableau_mod, "query_marches", lambda **kw: "dff-stub")
     monkeypatch.setattr(
         tableau_mod, "build_dashboard_cards", _fake_build_dashboard_cards(calls)
@@ -168,6 +174,6 @@ def test_tableau_build_dashboard_cards_recoit_le_theme(tableau_mod, monkeypatch)
     filtre_json = tableau_mod._normalize_filter_model(
         {"acheteur_nom": {"filterType": "text", "type": "contains", "filter": "ACME"}}
     )
-    tableau_mod._cards_pour_filtre(filtre_json, SOMBRE)
+    tableau_mod._cards_pour_filtre(filtre_json, SOMBRE, False)
 
     assert calls[-1]["theme"] == SOMBRE

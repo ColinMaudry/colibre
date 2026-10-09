@@ -644,6 +644,7 @@ def get_rows_tableau(request):
         sort_model,
         request.get("startRow", 0),
         request.get("endRow", 100),
+        operateurs=current_user_has_subscription(),
     )
     return {"rowData": rows, "rowCount": total}, total, total_unique
 
@@ -712,7 +713,12 @@ def download_data(n_clicks, filter_model, column_state, total=None):
         if c.get("sort")
     ]
     hidden_columns = [c["colId"] for c in (column_state or []) if c.get("hide")]
-    df = export_dataframe(filter_model, sort_model, hidden_columns)
+    df = export_dataframe(
+        filter_model,
+        sort_model,
+        hidden_columns,
+        operateurs=current_user_has_subscription(),
+    )
 
     if df.height > EXCEL_MAX_ROWS:
         extension = "csv"
@@ -1141,7 +1147,7 @@ def _normalize_filter_model(filter_model: dict | None) -> str:
 
 
 @cache.memoize()
-def _cards_pour_filtre(filter_model_json: str, theme: str):
+def _cards_pour_filtre(filter_model_json: str, theme: str, operateurs: bool):
     """Cards de l'observatoire pour le filtre courant de la grille.
 
     Mémoïsé sur le filterModel normalisé : basculer d'avant en arrière sur le
@@ -1151,10 +1157,11 @@ def _cards_pour_filtre(filter_model_json: str, theme: str):
     n'influent sur aucune agrégation.
 
     `theme` fait partie de la clé de cache : les figures sont colorées côté
-    serveur (#118).
+    serveur (#118). `operateurs` aussi : la syntaxe booléenne (#97) change le
+    SQL produit pour la même saisie.
     """
     ast = filtermodel_to_ast(json.loads(filter_model_json), schema)
-    where_sql, params = ast_to_sql(ast, schema)
+    where_sql, params = ast_to_sql(ast, schema, operateurs=operateurs)
     dff = query_marches(
         where_sql=where_sql, params=params, columns=observatoire_cards_columns()
     )
@@ -1181,7 +1188,8 @@ def update_mode_observatoire_cards(mode_actif, filter_model, card_order):
         # pas bougé.
         return no_update, f"{MODE_OBSERVATOIRE_CLASSES} d-none"
 
-    if not current_user_has_subscription():
+    operateurs = current_user_has_subscription()
+    if not operateurs:
         return (
             dbc.Alert(
                 "Fonctionnalité accessible en vous abonnant.",
@@ -1197,7 +1205,9 @@ def update_mode_observatoire_cards(mode_actif, filter_model, card_order):
             MODE_OBSERVATOIRE_CLASSES,
         )
 
-    cards = _cards_pour_filtre(_normalize_filter_model(filter_model), current_theme())
+    cards = _cards_pour_filtre(
+        _normalize_filter_model(filter_model), current_theme(), operateurs
+    )
 
     # Après le cache mémoïsé de _cards_pour_filtre, jamais dedans : l'ordre
     # ferait exploser la cardinalité des entrées (#107).
@@ -1225,10 +1235,13 @@ def get_top_org_rows_tableau(request, filter_model):
     """Lignes d'une grille top, sur le filtre courant de la grille de marchés."""
     if request is None or ctx.triggered_id is None:
         return no_update
+    operateurs = current_user_has_subscription()
     where_sql, params = ast_to_sql(
-        filtermodel_to_ast(filter_model or {}, schema), schema
+        filtermodel_to_ast(filter_model or {}, schema), schema, operateurs=operateurs
     )
-    return fetch_top_org_page(ctx.triggered_id["org_type"], where_sql, params, request)
+    return fetch_top_org_page(
+        ctx.triggered_id["org_type"], where_sql, params, request, operateurs=operateurs
+    )
 
 
 @callback(

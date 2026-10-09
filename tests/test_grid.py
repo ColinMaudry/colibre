@@ -55,7 +55,7 @@ def test_column_defs_hidden_flag():
 
 
 def test_fetch_grid_page_returns_rows_and_count():
-    rows, total, total_unique = fetch_grid_page(None, None, 0, 20)
+    rows, total, total_unique = fetch_grid_page(None, None, 0, 20, operateurs=False)
     assert isinstance(rows, list)
     assert isinstance(total, int)
     assert total >= len(rows)
@@ -67,31 +67,31 @@ def test_fetch_grid_page_returns_rows_and_count():
 
 
 def test_fetch_grid_page_filter_reduces_count():
-    _, total_all, _ = fetch_grid_page(None, None, 0, 1)
+    _, total_all, _ = fetch_grid_page(None, None, 0, 1, operateurs=False)
     fm = {"objet": {"filterType": "text", "type": "contains", "filter": "zzzzzznope"}}
-    rows, total_filtered, _ = fetch_grid_page(fm, None, 0, 20)
+    rows, total_filtered, _ = fetch_grid_page(fm, None, 0, 20, operateurs=False)
     assert total_filtered <= total_all
     assert rows == [] and total_filtered == 0
 
 
 def test_fetch_grid_page_offset_slicing():
-    rows, _, _ = fetch_grid_page(None, None, 0, 5)
+    rows, _, _ = fetch_grid_page(None, None, 0, 5, operateurs=False)
     assert len(rows) <= 5
 
 
 def test_export_dataframe_excludes_hidden_columns():
-    df = export_dataframe(None, None, hidden_columns=["objet"])
+    df = export_dataframe(None, None, hidden_columns=["objet"], operateurs=False)
     assert "objet" not in df.columns
 
 
 def test_export_dataframe_sans_colonne_technique():
-    df = export_dataframe(None, None, hidden_columns=[])
+    df = export_dataframe(None, None, hidden_columns=[], operateurs=False)
     assert "objet_normalise" not in df.columns
 
 
 def test_export_dataframe_applies_filter():
     fm = {"objet": {"filterType": "text", "type": "contains", "filter": "zzzzzznope"}}
-    df = export_dataframe(fm, None, hidden_columns=[])
+    df = export_dataframe(fm, None, hidden_columns=[], operateurs=False)
     assert df.height == 0
 
 
@@ -99,7 +99,7 @@ def test_export_dataframe_applies_base_scope():
     """base_where_sql restreint l'export à un sous-ensemble (ex. un acheteur),
     en plus du filterModel — utilisé par acheteur.py/titulaire.py (#41)."""
     # Récupère un acheteur_id présent dans le jeu de test.
-    unscoped = export_dataframe(None, None, hidden_columns=[])
+    unscoped = export_dataframe(None, None, hidden_columns=[], operateurs=False)
     assert unscoped.height > 0
     an_acheteur = unscoped["acheteur_id"][0]
 
@@ -109,6 +109,7 @@ def test_export_dataframe_applies_base_scope():
         hidden_columns=[],
         base_where_sql="acheteur_id = ?",
         base_params=(an_acheteur,),
+        operateurs=False,
     )
     assert scoped.height > 0
     assert scoped.height <= unscoped.height
@@ -130,9 +131,9 @@ def test_fetch_grid_page_caches_count_across_scroll_blocks(flask_app, monkeypatc
 
     fm = {"objet": {"filterType": "text", "type": "contains", "filter": "route"}}
     with flask_app.app_context():
-        _, total1, _ = fetch_grid_page(fm, None, 0, 20)
-        _, total2, _ = fetch_grid_page(fm, None, 20, 40)
-        _, total3, _ = fetch_grid_page(fm, None, 40, 60)
+        _, total1, _ = fetch_grid_page(fm, None, 0, 20, operateurs=False)
+        _, total2, _ = fetch_grid_page(fm, None, 20, 40, operateurs=False)
+        _, total3, _ = fetch_grid_page(fm, None, 40, 60, operateurs=False)
 
     assert call_count["n"] == 1
     assert total1 == total2 == total3

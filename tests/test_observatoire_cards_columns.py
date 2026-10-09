@@ -99,7 +99,7 @@ def test_observatoire_projette_les_colonnes_des_cards(monkeypatch):
 
     monkeypatch.setattr(observatoire, "prepare_dashboard_data", _espion)
 
-    observatoire._compute_dashboard_children.uncached(tuple(), CLAIR)
+    observatoire._compute_dashboard_children.uncached(tuple(), CLAIR, False)
 
     from src.figures import observatoire_cards_columns
 

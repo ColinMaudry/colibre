@@ -172,7 +172,7 @@ def get_data_schema() -> dict:
 
 
 def prepare_dashboard_data(
-    columns: list[str] | None = None, **filter_params
+    columns: list[str] | None = None, *, operateurs: bool, **filter_params
 ) -> pl.DataFrame:
     """Exécute la requête DuckDB filtrée pour le tableau de bord.
 
@@ -187,7 +187,7 @@ def prepare_dashboard_data(
     """
     from src.utils.table_sql import dashboard_filters_to_sql
 
-    where_sql, params = dashboard_filters_to_sql(**filter_params)
+    where_sql, params = dashboard_filters_to_sql(**filter_params, operateurs=operateurs)
     return query_marches(where_sql=where_sql, params=params, columns=columns)
 
 

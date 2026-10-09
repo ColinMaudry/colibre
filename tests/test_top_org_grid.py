@@ -74,7 +74,9 @@ def _request(start=0, end=10, filter_model=None, sort_model=None):
 
 def test_fetch_page_renvoie_lignes_et_total(flask_app, decp_synthetique):
     with flask_app.app_context():
-        response = fetch_top_org_page("titulaire", "TRUE", [], _request())
+        response = fetch_top_org_page(
+            "titulaire", "TRUE", [], _request(), operateurs=False
+        )
 
     assert response["rowCount"] == 30  # nombre de groupes, pas de lignes
     assert len(response["rowData"]) == 10
@@ -86,8 +88,12 @@ def test_fetch_page_renvoie_lignes_et_total(flask_app, decp_synthetique):
 
 def test_fetch_page_offset_sans_doublon(flask_app, decp_synthetique):
     with flask_app.app_context():
-        page1 = fetch_top_org_page("titulaire", "TRUE", [], _request(0, 10))
-        page2 = fetch_top_org_page("titulaire", "TRUE", [], _request(10, 20))
+        page1 = fetch_top_org_page(
+            "titulaire", "TRUE", [], _request(0, 10), operateurs=False
+        )
+        page2 = fetch_top_org_page(
+            "titulaire", "TRUE", [], _request(10, 20), operateurs=False
+        )
 
     ids1 = [r["titulaire_id"] for r in page1["rowData"]]
     ids2 = [r["titulaire_id"] for r in page2["rowData"]]
@@ -102,7 +108,9 @@ def test_fetch_page_filtre_trouve_au_dela_du_10e_rang(flask_app, decp_synthetiqu
         "titulaire_nom": {"filterType": "text", "type": "contains", "filter": "025"}
     }
     with flask_app.app_context():
-        response = fetch_top_org_page("titulaire", "TRUE", [], _request(0, 10, filtre))
+        response = fetch_top_org_page(
+            "titulaire", "TRUE", [], _request(0, 10, filtre), operateurs=False
+        )
 
     assert response["rowCount"] == 1
     assert response["rowData"][0]["titulaire_id"] == "T025"
@@ -113,7 +121,9 @@ def test_fetch_page_having_sur_attributions(flask_app, decp_synthetique):
         "Attributions": {"filterType": "number", "type": "greaterThan", "filter": 25}
     }
     with flask_app.app_context():
-        response = fetch_top_org_page("titulaire", "TRUE", [], _request(0, 10, filtre))
+        response = fetch_top_org_page(
+            "titulaire", "TRUE", [], _request(0, 10, filtre), operateurs=False
+        )
 
     assert response["rowCount"] == 5  # 30, 29, 28, 27, 26
     assert all(row["Attributions"] > 25 for row in response["rowData"])
@@ -124,7 +134,7 @@ def test_fetch_page_tri_numerique_pas_lexicographique(flask_app, decp_synthetiqu
     tri = [{"colId": "Attributions", "sort": "asc"}]
     with flask_app.app_context():
         response = fetch_top_org_page(
-            "titulaire", "TRUE", [], _request(0, 5, sort_model=tri)
+            "titulaire", "TRUE", [], _request(0, 5, sort_model=tri), operateurs=False
         )
 
     valeurs = [row["Attributions"] for row in response["rowData"]]
@@ -134,7 +144,7 @@ def test_fetch_page_tri_numerique_pas_lexicographique(flask_app, decp_synthetiqu
 def test_fetch_page_respecte_le_perimetre(flask_app, decp_synthetique):
     with flask_app.app_context():
         response = fetch_top_org_page(
-            "titulaire", "titulaire_id = ?", ["T003"], _request()
+            "titulaire", "titulaire_id = ?", ["T003"], _request(), operateurs=False
         )
 
     assert response["rowCount"] == 1
@@ -156,21 +166,23 @@ def test_fetch_page_compte_mis_en_cache_entre_les_pages(
     monkeypatch.setattr(top_module, "count_aggregate", compter)
 
     with flask_app.app_context():
-        fetch_top_org_page("titulaire", "TRUE", [], _request(0, 10))
-        fetch_top_org_page("titulaire", "TRUE", [], _request(10, 20))
-        fetch_top_org_page("titulaire", "TRUE", [], _request(20, 30))
+        fetch_top_org_page("titulaire", "TRUE", [], _request(0, 10), operateurs=False)
+        fetch_top_org_page("titulaire", "TRUE", [], _request(10, 20), operateurs=False)
+        fetch_top_org_page("titulaire", "TRUE", [], _request(20, 30), operateurs=False)
 
     assert appels["n"] == 1
 
 
 def test_fetch_page_sans_request():
-    assert fetch_top_org_page("titulaire", "TRUE", [], None) is no_update
+    assert (
+        fetch_top_org_page("titulaire", "TRUE", [], None, operateurs=False) is no_update
+    )
 
 
 def test_fetch_page_perimetre_vide(flask_app, decp_synthetique):
     with flask_app.app_context():
         response = fetch_top_org_page(
-            "titulaire", "titulaire_id = ?", ["INCONNU"], _request()
+            "titulaire", "titulaire_id = ?", ["INCONNU"], _request(), operateurs=False
         )
 
     assert response == {"rowData": [], "rowCount": 0}
@@ -191,6 +203,7 @@ def test_fetch_page_perimetre_et_having_ordonnes(flask_app, decp_synthetique):
             "titulaire_nom LIKE ?",
             ["Organisation 01%"],
             _request(0, 10, filtre),
+            operateurs=False,
         )
 
     # Périmètre : organisations 010 à 019 (10 orgs, Attributions 20..11).
@@ -224,6 +237,7 @@ def test_filtre_sur_le_nom_produit_un_where():
             }
         },
         "titulaire",
+        operateurs=False,
     )
     assert where_sql != "TRUE"
     assert where_params  # valeur liée, jamais concaténée
@@ -236,6 +250,7 @@ def test_filtre_sur_attributions_produit_un_having():
     _, _, having_sql, having_params = top_org_filter_sql(
         {AGG_COLUMN: {"filterType": "number", "type": "greaterThan", "filter": 5}},
         "titulaire",
+        operateurs=False,
     )
     assert having_sql == "(COUNT(*) > ?)"
     assert having_params == [5]
@@ -252,6 +267,7 @@ def test_filtre_attributions_in_range():
             }
         },
         "titulaire",
+        operateurs=False,
     )
     assert having_sql == "(COUNT(*) BETWEEN ? AND ?)"
     assert having_params == [2, 7]
@@ -270,6 +286,7 @@ def test_filtre_attributions_deux_conditions():
             }
         },
         "titulaire",
+        operateurs=False,
     )
     assert having_sql == "(COUNT(*) > ?) AND (COUNT(*) < ?)"
     assert having_params == [2, 9]
@@ -280,6 +297,7 @@ def test_filtre_attributions_valeur_decimale_non_tronquee():
     _, _, having_sql, having_params = top_org_filter_sql(
         {AGG_COLUMN: {"filterType": "number", "type": "lessThan", "filter": 5.5}},
         "titulaire",
+        operateurs=False,
     )
     assert having_sql == "(COUNT(*) < ?)"
     assert having_params == [5.5]
@@ -289,6 +307,7 @@ def test_filtre_attributions_valeur_non_numerique_ignoree():
     _, _, having_sql, having_params = top_org_filter_sql(
         {AGG_COLUMN: {"filterType": "number", "type": "greaterThan", "filter": "abc"}},
         "titulaire",
+        operateurs=False,
     )
     assert having_sql == ""
     assert having_params == []
@@ -299,6 +318,7 @@ def test_filtre_sur_colonne_hors_perimetre_ignore():
     where_sql, where_params, _, _ = top_org_filter_sql(
         {"objet": {"filterType": "text", "type": "contains", "filter": "route"}},
         "titulaire",
+        operateurs=False,
     )
     assert where_sql == "TRUE"
     assert where_params == []

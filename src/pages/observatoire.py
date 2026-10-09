@@ -562,15 +562,20 @@ def _normalize_filter_params(filter_params: dict) -> tuple:
 
 
 @cache.memoize()
-def _compute_dashboard_children(filter_params_normalized: tuple, theme: str):
+def _compute_dashboard_children(
+    filter_params_normalized: tuple, theme: str, operateurs: bool
+):
     # `theme` fait partie de la clé de cache : les figures sont colorées
-    # côté serveur (#118).
+    # côté serveur (#118). `operateurs` aussi : la syntaxe booléenne (#97)
+    # change le SQL produit pour la même saisie.
     logger.debug("Cache miss — computing dashboard")
     filter_params = {
         k: (list(v) if isinstance(v, tuple) else v) for k, v in filter_params_normalized
     }
 
-    dff = prepare_dashboard_data(columns=observatoire_cards_columns(), **filter_params)
+    dff = prepare_dashboard_data(
+        columns=observatoire_cards_columns(), operateurs=operateurs, **filter_params
+    )
     return build_dashboard_cards(
         dff,
         theme=theme,
@@ -607,7 +612,9 @@ def update_dashboard_cards(card_order, *filter_values):
             emettre("Observatoire", "filtres", nom, nb)
 
     filter_params_normalized = _normalize_filter_params(filter_params)
-    children = _compute_dashboard_children(filter_params_normalized, current_theme())
+    children = _compute_dashboard_children(
+        filter_params_normalized, current_theme(), current_user_has_subscription()
+    )
 
     # L'ordre est appliqué APRÈS le cache mémoïsé : le mettre dans
     # _compute_dashboard_children multiplierait les entrées de cache par le
@@ -657,8 +664,11 @@ def get_top_org_rows(request, *filter_values):
             FILTER_PARAMS, filter_values
         )
     }
-    where_sql, params = dashboard_filters_to_sql(**filter_params)
-    return fetch_top_org_page(ctx.triggered_id["org_type"], where_sql, params, request)
+    operateurs = current_user_has_subscription()
+    where_sql, params = dashboard_filters_to_sql(**filter_params, operateurs=operateurs)
+    return fetch_top_org_page(
+        ctx.triggered_id["org_type"], where_sql, params, request, operateurs=operateurs
+    )
 
 
 @callback(
@@ -698,7 +708,9 @@ def persist_card_order(card_order):
     prevent_initial_call=True,
 )
 def download_observatoire(_n_clicks, filter_params):
-    dff = prepare_dashboard_data(**(filter_params or {}))
+    dff = prepare_dashboard_data(
+        operateurs=current_user_has_subscription(), **(filter_params or {})
+    )
 
     if dff.height > EXCEL_MAX_ROWS:
         extension = "csv"
@@ -771,7 +783,9 @@ def update_download_button_observatoire(filter_params):
     le compte est refait à chaque changement de filtre, indépendamment du
     rendu des cards (déjà mémoïsé par _compute_dashboard_children).
     """
-    where_sql, params = dashboard_filters_to_sql(**(filter_params or {}))
+    where_sql, params = dashboard_filters_to_sql(
+        **(filter_params or {}), operateurs=current_user_has_subscription()
+    )
     height = count_marches(where_sql, params)
     total_unique = count_unique_marches(where_sql, params)
 

@@ -111,7 +111,7 @@ def _having_sql(spec: dict | None) -> tuple[str, list]:
 
 
 def top_org_filter_sql(
-    filter_model, org_type: str, extra_columns=()
+    filter_model, org_type: str, extra_columns=(), *, operateurs: bool
 ) -> tuple[str, list, str, list]:
     """(where_sql, where_params, having_sql, having_params) pour un filterModel.
 
@@ -128,7 +128,9 @@ def top_org_filter_sql(
         logger.warning(f"Filtre top ignoré (colonne hors périmètre) : {column!r}")
         model.pop(column)
 
-    where_sql, where_params = ast_to_sql(filtermodel_to_ast(model, schema), schema)
+    where_sql, where_params = ast_to_sql(
+        filtermodel_to_ast(model, schema), schema, operateurs=operateurs
+    )
     having_sql, having_params = _having_sql(agg_spec)
     return where_sql, where_params, having_sql, having_params
 
@@ -203,7 +205,9 @@ def _rows_with_links(dff: pl.DataFrame) -> list[dict]:
     return dff.to_dicts()
 
 
-def fetch_top_org_page(org_type, where_sql, params, request, extra_columns=()):
+def fetch_top_org_page(
+    org_type, where_sql, params, request, extra_columns=(), *, operateurs: bool
+):
     """Datasource server-side d'une grille top, scopée par (where_sql, params).
 
     Renvoie {"rowData": ..., "rowCount": <nombre de groupes>}, ou `no_update`
@@ -214,7 +218,7 @@ def fetch_top_org_page(org_type, where_sql, params, request, extra_columns=()):
 
     select_sql, group_by = _select_and_group(org_type, extra_columns)
     filter_sql, filter_params, having_sql, having_params = top_org_filter_sql(
-        request.get("filterModel"), org_type, extra_columns
+        request.get("filterModel"), org_type, extra_columns, operateurs=operateurs
     )
     scoped_where = f"({where_sql}) AND ({filter_sql})"
     query_params = [*params, *filter_params, *having_params]

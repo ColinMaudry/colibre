@@ -22,6 +22,7 @@ from src.figures import (
     make_card,
     make_column_picker,
 )
+from src.pages._compte_shell import current_user_has_subscription
 from src.utils.data import DF_ACHETEURS, get_annuaire_data, get_departement_region
 from src.utils.entity_grid import entity_scope, register_entity_grid_callbacks
 from src.utils.frontend import DROPDOWN_LABELS_FR, EXCEL_MAX_ROWS, get_button_properties
@@ -442,7 +443,12 @@ def get_top_titulaires_rows(request, pathname, ach_year):
         return no_update
     where_sql, params = _acheteur_scope(pathname, ach_year)
     return fetch_top_org_page(
-        "titulaire", where_sql, params, request, ["titulaire_distance"]
+        "titulaire",
+        where_sql,
+        params,
+        request,
+        ["titulaire_distance"],
+        operateurs=current_user_has_subscription(),
     )
 
 

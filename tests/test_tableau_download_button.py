@@ -6,6 +6,8 @@ Sans filtre, le bouton renvoie plutôt vers le CSV complet publié sur
 data.gouv.fr au lieu de faire générer un export de plusieurs millions de
 lignes côté serveur (#142, passe de correction 2)."""
 
+import pytest
+
 from src.utils.frontend import EXCEL_MAX_ROWS
 
 _UN_FILTRE = {"objet": {"filterType": "text", "type": "contains", "filter": "voirie"}}
@@ -13,6 +15,15 @@ _UN_FILTRE = {"objet": {"filterType": "text", "type": "contains", "filter": "voi
 _MESSAGE_DATA_GOUV = (
     "Le jeu de données complet est téléchargé depuis data.gouv.fr au format CSV."
 )
+
+
+@pytest.fixture(autouse=True)
+def _sans_abonnement(monkeypatch):
+    """Callbacks appelés hors requête : pas d'utilisateur courant (#97)."""
+    from src.app import app  # noqa: F401  (instancie Dash avant les pages)
+    from src.pages import tableau
+
+    monkeypatch.setattr(tableau, "current_user_has_subscription", lambda: False)
 
 
 def test_update_meta_excel_sous_le_seuil():
