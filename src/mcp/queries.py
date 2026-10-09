@@ -11,6 +11,8 @@ from src.utils.data import DATA_SCHEMA, DF_ACHETEURS, DF_TITULAIRES
 from src.utils.search import search_org
 
 PAGE_SIZE = 50
+# Même borne que l'API REST (src/api/routes.py.MAX_PAGE_SIZE).
+MAX_PAGE_SIZE = 1000
 TOP_N = 10
 ORG_FRAMES = {"acheteur": DF_ACHETEURS, "titulaire": DF_TITULAIRES}
 
@@ -104,6 +106,7 @@ def search_marches(
     date_max: str | None = None,
     departement: str | None = None,
     page: int = 1,
+    page_size: int = PAGE_SIZE,
     filtres_avances: dict | None = None,
     colonnes: list[str] | None = None,
 ) -> dict:
@@ -137,14 +140,20 @@ def search_marches(
         out_columns = list(dict.fromkeys(["uid", *colonnes]))
 
     page = max(1, int(page))
-    offset = (page - 1) * PAGE_SIZE
+    page_size = int(page_size)
+    if page_size < 1 or page_size > MAX_PAGE_SIZE:
+        return {
+            "error": f"page_size doit être dans [1, {MAX_PAGE_SIZE}]",
+            "champ": "page_size",
+        }
+    offset = (page - 1) * page_size
     order_by = order_sql or '"dateNotification" DESC, "uid" DESC'
     df = query_marches(
         where_sql,
         params,
         columns=out_columns,
         order_by=order_by,
-        limit=PAGE_SIZE,
+        limit=page_size,
         offset=offset,
     )
     total = count_marches(where_sql, params)
@@ -153,7 +162,7 @@ def search_marches(
     for marche in marches:
         marche["lien"] = f"{base}/marches/{marche['uid']}"
     return {
-        "meta": {"page": page, "page_size": PAGE_SIZE, "total": total},
+        "meta": {"page": page, "page_size": page_size, "total": total},
         "marches": marches,
     }
 

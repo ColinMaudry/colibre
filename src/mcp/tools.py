@@ -74,6 +74,7 @@ def rechercher_marches(
     date_max: str | None = None,
     departement: str | None = None,
     page: int = 1,
+    page_size: int = 50,
     filtres_avances: dict | None = None,
     colonnes: list[ColonneMarche] | None = None,
 ) -> dict:
@@ -94,7 +95,9 @@ def rechercher_marches(
     Colonnes disponibles via schema_donnees().colonnes_disponibles.
     Chaque marché renvoyé contient en plus un champ `lien` (URL de la fiche
     marché sur colibre).
-    page : numéro de page (50 résultats par page).
+    page : numéro de page.
+    page_size : nombre de résultats par page (défaut 50, max 1000 ;
+    erreur si hors [1, 1000]).
     Retourne {meta: {page, page_size, total}, marches: [...]}.
     """
     track_mcp_tool("rechercher_marches", query=objet_contient)
@@ -109,6 +112,7 @@ def rechercher_marches(
         date_max=date_max,
         departement=departement,
         page=page,
+        page_size=page_size,
         filtres_avances=filtres_avances,
         colonnes=colonnes,
     )

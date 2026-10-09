@@ -205,6 +205,17 @@ class _RegistrationEndpoint(ClientRegistrationEndpoint):
     def resolve_public_key(self, request):
         return None
 
+    def generate_client_info(self, request):
+        # authlib génère toujours un client_secret, même pour un client public.
+        # Nos clients s'authentifient en "none" au token endpoint ; or un client
+        # qui renvoie ce secret (oh-my-pi le fait dès qu'il le reçoit) est
+        # rejeté par authenticate_none → invalid_client. RFC 7591 §3.2.1 : le
+        # secret est OPTIONNEL, on ne l'émet donc pas.
+        info = super().generate_client_info(request)
+        info.pop("client_secret", None)
+        info.pop("client_secret_expires_at", None)
+        return info
+
     def get_server_metadata(self):
         return metadata.authorization_server_metadata(_base())
 

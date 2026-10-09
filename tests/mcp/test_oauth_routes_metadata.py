@@ -47,4 +47,10 @@ def test_dynamic_client_registration(oauth_app):
         },
     )
     assert resp.status_code == 201
-    assert "client_id" in resp.get_json()
+    body = resp.get_json()
+    assert "client_id" in body
+    # Client public (auth "none") : aucun secret ne doit être émis, sinon les
+    # clients qui le renvoient à /oauth/token (oh-my-pi) sont rejetés en
+    # invalid_client par l'authentification "none".
+    assert "client_secret" not in body
+    assert "client_secret_expires_at" not in body

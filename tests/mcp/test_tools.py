@@ -54,3 +54,14 @@ def test_rechercher_marches_colonnes_passthrough(monkeypatch):
     m = result["marches"][0]
     assert set(m.keys()) == {"uid", "objet", "lien"}
     assert m["lien"] == f"https://colibre.fr/marches/{m['uid']}"
+
+
+def test_rechercher_marches_page_size_passthrough():
+    result = tools.rechercher_marches(acheteur_id="123", page_size=10)
+    assert result["meta"]["page_size"] == 10
+
+
+def test_rechercher_marches_page_size_out_of_bounds_returns_error():
+    result = tools.rechercher_marches(acheteur_id="123", page_size=1001)
+    assert "error" in result
+    assert result["champ"] == "page_size"

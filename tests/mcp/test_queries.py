@@ -217,6 +217,36 @@ def test_search_marches_lien_relative_when_base_unset(monkeypatch):
     assert m["lien"] == f"/marches/{m['uid']}"
 
 
+def test_search_marches_page_size_reflected_in_meta():
+    result = search_marches(acheteur_id="123", page_size=10)
+    assert result["meta"]["page_size"] == 10
+
+
+def test_search_marches_page_size_controls_limit_and_offset(monkeypatch):
+    import polars as pl
+
+    from src.mcp import queries as queries_mod
+
+    captured = {}
+
+    def fake_query_marches(where_sql, params, columns, order_by, limit, offset):
+        captured["limit"] = limit
+        captured["offset"] = offset
+        return pl.DataFrame()
+
+    monkeypatch.setattr(queries_mod, "query_marches", fake_query_marches)
+    search_marches(page=3, page_size=25)
+    assert captured["limit"] == 25
+    assert captured["offset"] == 2 * 25
+
+
+def test_search_marches_page_size_out_of_bounds_returns_error():
+    for bad in (0, -1, 1001):
+        result = search_marches(acheteur_id="123", page_size=bad)
+        assert "error" in result
+        assert result["champ"] == "page_size"
+
+
 def test_describe_schema_exposes_colonnes_disponibles():
     from src.mcp.queries import describe_schema
 
