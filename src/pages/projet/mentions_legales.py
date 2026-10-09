@@ -138,8 +138,12 @@ L'outil utilisé pour le suivi d'audience est [Matomo](https://matomo.org/), un 
 
 Les données suivantes sont également enregistrées, de manière anonyme, afin de mieux comprendre comment vous utilisez le site et l'améliorer :
 
-- recherches sur la page d'accueil
-- filtres appliqués aux données
+- recherches sur la page d'accueil et nombre de résultats
+- combinaisons de filtres appliquées aux données
+- téléchargements de données (format et nombre de lignes)
+- changements de thème (clair ou sombre) et de mode d'affichage du tableau (lignes ou observatoire)
+- réinitialisations des filtres et ouvertures du mode d'emploi
+- réorganisation des tuiles de l'observatoire
 """
             ),
             html.H4("Attributions", id="attributions"),

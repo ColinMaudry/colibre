@@ -1,9 +1,7 @@
-from unittest.mock import patch
-
 import pytest
 
 import src.app  # noqa: F401  # instancie l'app → register_page() des pages
-from src.pages.tableau import get_rows_tableau, reset_view
+from src.pages.tableau import reset_view
 from src.utils import grid as grid_module
 from src.utils.grid import (
     apply_persisted_layout,
@@ -115,19 +113,6 @@ def test_export_dataframe_applies_base_scope():
     assert scoped.height > 0
     assert scoped.height <= unscoped.height
     assert set(scoped["acheteur_id"].to_list()) == {an_acheteur}
-
-
-def test_get_rows_tableau_tracks_search_once_per_filter_not_per_scroll_block():
-    """Régression revue finale #41 : AG Grid envoie une getRowsRequest par bloc
-    de défilement infini, avec le même filterModel tant que le filtre ne
-    change pas. track_search ne doit être appelé qu'une fois par filtre (au
-    premier bloc, startRow == 0), pas une fois par bloc défilé."""
-    fm = {"objet": {"filterType": "text", "type": "contains", "filter": "route"}}
-    with patch("src.pages.tableau.track_search") as mocked:
-        get_rows_tableau({"filterModel": fm, "startRow": 0, "endRow": 100})
-        get_rows_tableau({"filterModel": fm, "startRow": 100, "endRow": 200})
-        get_rows_tableau({"filterModel": fm, "startRow": 200, "endRow": 300})
-    mocked.assert_called_once()
 
 
 def test_fetch_grid_page_caches_count_across_scroll_blocks(flask_app, monkeypatch):

@@ -36,9 +36,9 @@ def _envoyer(params: dict) -> None:
         return
     url, site_id = config
     try:
-        # timeout court : track_search s'exécute de façon synchrone dans une
-        # recherche utilisateur (src/utils/search.py), un Matomo qui pend ne
-        # doit pas ajouter sa latence à la requête de l'utilisateur.
+        # timeout court : track_mcp_tool s'exécute de façon synchrone dans un
+        # appel d'outil MCP (src/mcp/tools.py), un Matomo qui pend ne doit pas
+        # ajouter sa latence à la réponse de l'outil.
         post(url=url, data={**params, "idsite": site_id}, timeout=2.0)
     except Exception:  # noqa: BLE001
         # Ne propage jamais (invariant de ce module), mais avertit une fois
@@ -58,36 +58,6 @@ def _horodatage() -> dict:
         "m": maintenant.tm_min,
         "s": maintenant.tm_sec,
     }
-
-
-def track_search(query, category):
-    """Enregistre une recherche dans Matomo (best-effort)."""
-    if len(query) < 4:
-        return
-    _envoyer(
-        {
-            "rec": "1",
-            "url": "https://colibre.fr",
-            "action_name": "search" if category == "home_page_search" else "filter",
-            "search_cat": category,
-            "search": query,
-            **_horodatage(),
-        }
-    )
-
-
-def track_download(path):
-    if not path:
-        return
-    page = "https://colibre.fr" + path
-    _envoyer_async(
-        {
-            "rec": "1",
-            "url": page,
-            "download": page,
-            **_horodatage(),
-        }
-    )
 
 
 def track_mcp_tool(tool_name: str, query: str | None = None) -> None:

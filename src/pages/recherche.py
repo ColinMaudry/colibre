@@ -11,6 +11,7 @@ from src.utils.cache import cache
 from src.utils.data import DATA_SCHEMA, DF_ACHETEURS, DF_TITULAIRES
 from src.utils.search import search_org
 from src.utils.seo import META_CONTENT
+from src.utils.suivi import emettre_recherche
 from src.utils.table import format_number
 
 NAME = "Recherche"
@@ -334,6 +335,7 @@ def layout(**_):
 def update_search_results(n_submit, n_clicks, query):
     if query and len(query) >= 1:
         cols = []
+        total = 0
 
         for org_type in ["acheteur", "titulaire"]:
             if org_type == "acheteur":
@@ -346,6 +348,7 @@ def update_search_results(n_submit, n_clicks, query):
             # Search acheteurs and titulaires using the same function
             results = search_org(dff, query, org_type=org_type)
             count = results.height
+            total += count
 
             col = (
                 dbc.Col(
@@ -368,6 +371,9 @@ def update_search_results(n_submit, n_clicks, query):
                 else html.P(f"Aucun {org_type} trouvé.")
             )
             cols.append(col)
+
+        if query.strip():
+            emettre_recherche(query.strip(), "accueil", total)
 
         return cols, {"display": "none"}
     return html.P(""), home_intro.style

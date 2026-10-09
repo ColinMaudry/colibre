@@ -578,6 +578,7 @@ app.layout = html.Div(
     [
         dcc.Store(id="csrf-token"),
         dcc.Store(id="theme-enregistre"),
+        dcc.Store(id="suivi-matomo"),
         navbar,
         dbc.Container(
             page_container,
@@ -724,12 +725,42 @@ app.clientside_callback(
     """
     function(theme) {
         // Le thème s'applique côté serveur (<html>, figures) : on recharge.
-        if (theme) { window.location.reload(); }
+        if (theme) {
+            if (window.colibreSuivi) {
+                window.colibreSuivi.evenement("Interface", "theme", theme);
+            }
+            window.location.reload();
+        }
         return window.dash_clientside.no_update;
     }
     """,
     Output("theme-enregistre", "id"),
     Input("theme-enregistre", "data"),
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    """
+    function(data) {
+        // Relais vers Matomo (src/assets/suivi.js) des gestes émis côté
+        // serveur par src.utils.suivi.
+        if (data && window.colibreSuivi) {
+            if (data.type === "recherche") {
+                window.colibreSuivi.recherche(
+                    data.mot_cle, data.categorie, data.nb_resultats
+                );
+            } else {
+                window.colibreSuivi.evenement(
+                    data.categorie, data.action, data.nom, data.valeur
+                );
+            }
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("suivi-matomo", "id"),
+    Input("suivi-matomo", "data"),
     prevent_initial_call=True,
 )
 

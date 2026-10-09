@@ -181,7 +181,7 @@ def search_organisations(
         raise ValueError(
             f"type invalide: {org_type!r} (attendu 'acheteur' ou 'titulaire')"
         )
-    df = search_org(ORG_FRAMES[org_type], query, org_type, track=False).head(limite)
+    df = search_org(ORG_FRAMES[org_type], query, org_type).head(limite)
     return [
         {
             "id": _extract_plain_text(r[f"{org_type}_id"]),

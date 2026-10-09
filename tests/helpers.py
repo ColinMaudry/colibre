@@ -18,3 +18,23 @@ def walk_components(component):
             yield child
         else:
             yield from walk_components(child)
+
+
+def installer_espion_paq(driver):
+    """Installe un faux `window._paq` avant chaque chargement de page.
+
+    À appeler avant le premier chargement (donc avant `start_server`).
+    """
+    driver.execute_cdp_cmd(
+        "Page.addScriptToEvaluateOnNewDocument", {"source": "window._paq = [];"}
+    )
+
+
+def appels_paq(driver, methode=None) -> list[list]:
+    """Copie JSON des appels poussés dans `window._paq`, filtrés sur la méthode."""
+    appels = driver.execute_script(
+        "return JSON.parse(JSON.stringify(window._paq || []));"
+    )
+    if methode is None:
+        return appels
+    return [a for a in appels if a and a[0] == methode]

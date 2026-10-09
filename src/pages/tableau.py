@@ -49,6 +49,7 @@ from src.utils.query_ast import (
     filtermodel_to_ast,
 )
 from src.utils.seo import META_CONTENT
+from src.utils.suivi import emettre
 from src.utils.table import (
     format_number,
     get_default_hidden_columns,
@@ -58,7 +59,6 @@ from src.utils.table import (
     write_styled_excel,
 )
 from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
-from src.utils.tracking import track_download, track_search
 
 # L'URL de l'API data.gouv.fr redirige toujours vers la dernière version
 # publiée du CSV complet des DECP (mise à jour quotidienne) : pas besoin de
@@ -104,9 +104,15 @@ register_page(
 # maison (store tableau-hidden-columns → régénération des columnDefs → événement
 # columnVisible de source 'gridOptionsChanged', identique pour l'utilisateur et
 # l'application programmatique) : indistinguable via AG Grid, donc non écoutée.
+#
+# filterChanged alimente aussi le suivi Matomo des filtres (issue #149), avec
+# les mêmes sources programmatiques ignorées.
 _SHARE_DRIFT_LISTENERS = {
-    event: ["hideShareOnUserAction(params)"]
-    for event in ("filterChanged", "sortChanged")
+    "filterChanged": [
+        "hideShareOnUserAction(params)",
+        "suivreFiltres(params, 'Tableau')",
+    ],
+    "sortChanged": ["hideShareOnUserAction(params)"],
 }
 
 DATATABLE = html.Div(
@@ -633,12 +639,6 @@ def get_rows_tableau(request):
         return no_update, no_update, no_update
     filter_model = request.get("filterModel") or None
     sort_model = request.get("sortModel") or None
-    # AG Grid renvoie une nouvelle requête getRowsRequest pour chaque bloc de
-    # défilement infini, avec le même filterModel tant que le filtre ne change
-    # pas. Ne compter qu'une recherche par changement de filtre/tri (bloc 0),
-    # pas une par bloc chargé au défilement.
-    if filter_model and request.get("startRow", 0) == 0:
-        track_search(json.dumps(filter_model), "tableau")
     rows, total, total_unique = fetch_grid_page(
         filter_model,
         sort_model,
@@ -693,13 +693,15 @@ register_filter_pills_callbacks("tableau", "tableau_grid", clear_active_view=Tru
     Input("btn-download-data", "n_clicks"),
     State("tableau_grid", "filterModel"),
     State("tableau_grid", "columnState"),
+    State("tableau-total", "data"),
     prevent_initial_call=True,
 )
-def download_data(n_clicks, filter_model, column_state):
+def download_data(n_clicks, filter_model, column_state, total=None):
     if not filter_model:
         # Sans filtre, le bouton pointe déjà (via href) vers le CSV complet
         # de data.gouv.fr — un clic ne doit pas en plus déclencher la
         # génération d'un fichier de plusieurs millions de lignes ici.
+        emettre("Tableau", "telechargement", "csv-datagouv", total or 0)
         return no_update
 
     from src.utils.grid import export_dataframe
@@ -710,7 +712,6 @@ def download_data(n_clicks, filter_model, column_state):
         if c.get("sort")
     ]
     hidden_columns = [c["colId"] for c in (column_state or []) if c.get("hide")]
-    track_search(json.dumps(filter_model), "tab download")
     df = export_dataframe(filter_model, sort_model, hidden_columns)
 
     if df.height > EXCEL_MAX_ROWS:
@@ -724,8 +725,8 @@ def download_data(n_clicks, filter_model, column_state):
         def to_bytes(buffer):
             write_styled_excel(df, buffer)
 
+    emettre("Tableau", "telechargement", extension, df.height)
     date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    track_download("/tableau")
     return dcc.send_bytes(to_bytes, filename=f"decp_{date}.{extension}")
 
 
@@ -735,6 +736,8 @@ def download_data(n_clicks, filter_model, column_state):
     [State("tableau_help", "is_open")],
 )
 def toggle_tableau_help(click_open, click_close, is_open):
+    if ctx.triggered_id == "tableau_help_open":
+        emettre("Tableau", "mode_emploi")
     if click_open or click_close:
         return not is_open
     return is_open
@@ -839,6 +842,7 @@ def reset_view(n_clicks, column_state):
     cleared_sort = [
         {**col, "sort": None, "sortIndex": None} for col in (column_state or [])
     ]
+    emettre("Tableau", "reinitialisation")
     return {}, cleared_sort
 
 
@@ -1193,7 +1197,6 @@ def update_mode_observatoire_cards(mode_actif, filter_model, card_order):
             MODE_OBSERVATOIRE_CLASSES,
         )
 
-    track_search(json.dumps(filter_model), "tab observatoire")
     cards = _cards_pour_filtre(_normalize_filter_model(filter_model), current_theme())
 
     # Après le cache mémoïsé de _cards_pour_filtre, jamais dedans : l'ordre
@@ -1292,14 +1295,24 @@ clientside_callback(
 )
 
 
+# Seule une bascule manuelle est suivie : la restauration au chargement
+# renvoie la valeur déjà stockée, et un interrupteur désactivé (non-abonné)
+# n'est jamais actionné par l'utilisateur.
 clientside_callback(
     """
-    function(value) {
+    function(value, stocke, desactive) {
+        if (!desactive && value !== (stocke === true) && window.colibreSuivi) {
+            window.colibreSuivi.evenement(
+                "Tableau", "mode", value ? "observatoire" : "lignes"
+            );
+        }
         return value;
     }
     """,
     Output("tableau-mode-observatoire-persiste", "data"),
     Input("tableau-mode-observatoire", "value"),
+    State("tableau-mode-observatoire-persiste", "data"),
+    State("tableau-mode-observatoire", "disabled"),
     prevent_initial_call=True,
 )
 

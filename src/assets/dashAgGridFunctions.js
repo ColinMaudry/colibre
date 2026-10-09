@@ -28,3 +28,37 @@ dagfuncs.hideShareOnUserAction = function (params) {
     window.dash_clientside.set_props("active-view", { data: null });
   }
 };
+
+// Suivi Matomo des filtres de grille (issue #149). La saisie dans un filtre
+// flottant produit un filterChanged par frappe : anti-rebond de 3 s par grille,
+// puis envoi du jeu de filtres stable, lu au moment de l'envoi. Les sources
+// programmatiques (vue partagée, filtre d'URL, localStorage, réinitialisation)
+// sont ignorées ; un jeu vide n'est pas envoyé. window.colibreSuivi est lu à
+// l'échéance, donc indépendamment de l'ordre de chargement des assets.
+var SUIVI_FILTRES_DELAI_MS = 3000;
+var suiviFiltresMinuteries = new WeakMap();
+
+dagfuncs.suivreFiltres = function (params, categorie) {
+  var source = params && params.source;
+  if (SHARE_PROGRAMMATIC_SOURCES.indexOf(source) !== -1) {
+    return;
+  }
+  var api = params.api;
+  clearTimeout(suiviFiltresMinuteries.get(api));
+  suiviFiltresMinuteries.set(
+    api,
+    setTimeout(function () {
+      suiviFiltresMinuteries.delete(api);
+      if (api.isDestroyed && api.isDestroyed()) return;
+      var fm = api.getFilterModel() || {};
+      var nb = Object.keys(fm).length;
+      if (nb === 0 || !window.colibreSuivi) return;
+      window.colibreSuivi.evenement(
+        categorie,
+        "filtres",
+        window.colibreSuivi.serialiserFiltres(fm),
+        nb
+      );
+    }, SUIVI_FILTRES_DELAI_MS)
+  );
+};
