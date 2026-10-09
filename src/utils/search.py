@@ -2,12 +2,9 @@ import polars as pl
 from unidecode import unidecode
 
 from src.utils.table import add_links
-from src.utils.tracking import track_search
 
 
-def search_org(
-    dff: pl.DataFrame, query: str, org_type: str, track: bool = True
-) -> pl.DataFrame:
+def search_org(dff: pl.DataFrame, query: str, org_type: str) -> pl.DataFrame:
     """
     Search in either 'acheteur' or 'titulaire' DataFrame.
 
@@ -18,10 +15,6 @@ def search_org(
     """
     if not query.strip():
         return dff.select(pl.lit(False).alias("matches"))
-
-    # Enregistrement des recherche dans Matomo
-    if track:
-        track_search(query, "home_page_search")
 
     # Normalize query
     normalized_query = unidecode(query.strip()).upper()

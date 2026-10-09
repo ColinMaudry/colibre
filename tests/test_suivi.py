@@ -68,3 +68,27 @@ def test_serialisation_observatoire_ignore_les_vides():
 def test_serialisation_observatoire_tronque_a_500():
     chaine, n = suivi.serialiser_filtres_observatoire({"marche_objet": "x" * 600})
     assert len(chaine) == 500 and chaine.endswith("…") and n == 1
+
+
+def test_recherche_accueil_emet_une_seule_recherche_avec_la_somme(monkeypatch):
+    import src.app  # noqa: F401  # instancie l'app → register_page()
+    from src.pages import recherche
+
+    envois = []
+    monkeypatch.setattr(
+        "src.utils.suivi.set_props", lambda cid, p: envois.append(p["data"])
+    )
+    recherche.update_search_results(1, None, "  ACHETEUR 1  ")
+    (data,) = envois
+    attendu = sum(
+        recherche.search_org(df, "ACHETEUR 1", t).height
+        for df, t in (
+            (recherche.DF_ACHETEURS, "acheteur"),
+            (recherche.DF_TITULAIRES, "titulaire"),
+        )
+    )
+    assert (data["mot_cle"], data["categorie"], data["nb_resultats"]) == (
+        "ACHETEUR 1",
+        "accueil",
+        attendu,
+    )
