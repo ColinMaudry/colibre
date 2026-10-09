@@ -401,3 +401,28 @@ def test_ensure_database_builds_when_needed(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "build_database", lambda p: called.setdefault("built", p))
     db._ensure_database()
     assert called.get("built") == dbf
+
+
+def test_build_ajoute_la_colonne_objet_normalise(built_db):
+    import duckdb
+
+    from src.utils.text_normalization import normalize_text
+
+    with duckdb.connect(str(built_db), read_only=True) as c:
+        rows = c.execute("SELECT objet, objet_normalise FROM decp").fetchall()
+
+    assert ("Études", "Etudes") in rows
+    assert all(normalise == normalize_text(objet) for objet, normalise in rows)
+
+
+def test_colonnes_normalisees_masquees_du_schema():
+    from src.db import query_marches, schema
+    from src.utils.table import COLUMNS
+
+    assert "objet_normalise" not in schema.names()
+    assert "objet_normalise" not in COLUMNS
+    assert "objet_normalise" not in query_marches(limit=1).columns
+    # La colonne reste lisible quand on la demande explicitement.
+    assert query_marches(columns=["objet_normalise"], limit=1).columns == [
+        "objet_normalise"
+    ]

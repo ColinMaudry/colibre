@@ -86,6 +86,11 @@ def test_export_dataframe_excludes_hidden_columns():
     assert "objet" not in df.columns
 
 
+def test_export_dataframe_sans_colonne_technique():
+    df = export_dataframe(None, None, hidden_columns=[])
+    assert "objet_normalise" not in df.columns
+
+
 def test_export_dataframe_applies_filter():
     fm = {"objet": {"filterType": "text", "type": "contains", "filter": "zzzzzznope"}}
     df = export_dataframe(fm, None, hidden_columns=[])

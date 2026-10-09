@@ -10,6 +10,7 @@ import polars.selectors as cs
 from polars.exceptions import ComputeError
 
 from src.utils import get_last_modified, logger
+from src.utils.text_normalization import NORMALIZED_COLUMNS, normalize_text_sql
 
 # Format accepté par DuckDB pour memory_limit, ex. « 2GB », « 512MiB ».
 # Validé plutôt qu'interpolé tel quel : SET n'accepte pas de paramètre lié.
@@ -168,7 +169,14 @@ def _load_source_frame() -> pl.DataFrame:
 #
 #   1 : schéma d'origine
 #   2 : #128 ajoute nb_marches à acheteurs_departement et titulaires_departement
-SCHEMA_VERSION = 2
+#   3 : #147 ajoute objet_normalise à decp
+SCHEMA_VERSION = 3
+
+# Colonnes techniques précalculées à la construction (#147). Elles servent aux
+# filtres, jamais à l'affichage : `schema` et `SELECT *` les excluent pour
+# qu'elles n'apparaissent ni dans les grilles, ni dans les exports, ni dans
+# l'API.
+_EXCLUDE_NORMALIZED = f"EXCLUDE ({', '.join(NORMALIZED_COLUMNS.values())})"
 
 # Extraites en constantes de module (plutôt qu'inline dans build_database)
 # pour que tests/seo/test_tables_nb_marches.py puisse exécuter cette logique
@@ -213,8 +221,13 @@ def build_database(db_path: Path) -> None:
     frame.write_parquet(str(staging_parquet))
     try:
         with duckdb.connect(str(tmp_path)) as w:
+            normalized_columns = ", ".join(
+                f"{normalize_text_sql(col)} AS {name}"
+                for col, name in NORMALIZED_COLUMNS.items()
+            )
             w.execute(
-                f"CREATE TABLE decp AS SELECT * FROM read_parquet('{staging_parquet}')"
+                f"CREATE TABLE decp AS SELECT *, {normalized_columns} "
+                f"FROM read_parquet('{staging_parquet}')"
             )
             w.execute(
                 "CREATE TABLE acheteurs_marches AS "
@@ -270,7 +283,9 @@ def _ensure_database() -> Path:
 DB_PATH = _ensure_database()
 conn: duckdb.DuckDBPyConnection = duckdb.connect(str(DB_PATH), read_only=True)
 configure_connection(conn)
-schema: pl.Schema = conn.execute("SELECT * FROM decp LIMIT 0").pl().schema
+schema: pl.Schema = (
+    conn.execute(f"SELECT * {_EXCLUDE_NORMALIZED} FROM decp LIMIT 0").pl().schema
+)
 
 
 def get_cursor() -> duckdb.DuckDBPyConnection:
@@ -292,7 +307,7 @@ def query_marches(
     code, never user input). `params` values are passed through DuckDB's
     parameter binding.
     """
-    cols = ", ".join(columns) if columns else "*"
+    cols = ", ".join(columns) if columns else f"* {_EXCLUDE_NORMALIZED}"
     sql = f"SELECT {cols} FROM decp WHERE {where_sql}"
     if order_by:
         sql += f" ORDER BY {order_by}"
