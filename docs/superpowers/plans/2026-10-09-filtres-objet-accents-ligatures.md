@@ -242,20 +242,18 @@ git commit -m "API REST et MCP : filtres Objet insensibles aux accents, ligature
 
 ---
 
-### Task 6: Documentation et CHANGELOG
+### Task 6: Documentation API et MCP
 
 **Files:**
 
 - Modify: `src/api/routes.py` (≈ l.181-184, description des opérateurs `contains`/`notcontains`/`startswith` ; docstring de `data()` si elle liste ces opérateurs)
 - Modify: `src/mcp/tools.py` (docstring de `rechercher_marches`, ligne `objet_contient`)
-- Modify: `CHANGELOG.md` (section `#### 3.3.0`)
 - Test: `tests/api/test_openapi_doc.py`, `tests/mcp/test_tools.py`
 
 - [ ] **Step 1: Mettre à jour les textes**
 
   - `routes.py` : les opérateurs `contains`/`notcontains` et `startswith` précisent « insensible à la casse, aux accents, aux ligatures et aux apostrophes typographiques pour `objet` ».
   - `tools.py` : `objet_contient (texte de l'objet, insensible à la casse, aux accents, aux ligatures œ/æ et à l'apostrophe typographique)`.
-  - `CHANGELOG.md`, nouvelle puce sous 3.3.0 : `- Les filtres sur l'objet (tableaux, observatoire, API REST, connecteur MCP) ne sont plus sensibles aux accents, à œ/oe ni à l'apostrophe typographique ([#147](https://github.com/colinmaudry/colibre/issues/147))`.
 
 - [ ] **Step 2: Vérifier**
 
@@ -264,9 +262,9 @@ Run: `uv run pytest tests/api/test_openapi_doc.py tests/mcp/test_tools.py -v` �
 - [ ] **Step 3: Commit**
 
 ```bash
-uv run pre-commit run --files src/api/routes.py src/mcp/tools.py CHANGELOG.md
-git add src/api/routes.py src/mcp/tools.py CHANGELOG.md
-git commit -m "Doc API/MCP et CHANGELOG : filtres Objet normalisés (#147)"
+uv run pre-commit run --files src/api/routes.py src/mcp/tools.py
+git add src/api/routes.py src/mcp/tools.py
+git commit -m "Doc API et MCP : filtres Objet normalisés (#147)"
 ```
 
 ---
