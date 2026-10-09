@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_data_without_token_returns_401(api_client):
     client, _ = api_client
     resp = client.get("/api/v1/data")
@@ -87,6 +90,33 @@ def test_data_columns_unknown_returns_400(api_client, valid_token_header):
         "/api/v1/data?columns=uid,foobar",
         headers=valid_token_header,
     )
+    assert resp.status_code == 400
+
+
+def test_data_objet_contains_ignore_accents(api_client, valid_token_header):
+    client, _ = api_client
+    sans = client.get("/api/v1/data?objet__contains=objet", headers=valid_token_header)
+    avec = client.get("/api/v1/data?objet__contains=ôbjét", headers=valid_token_header)
+    assert avec.status_code == 200
+    assert sans.get_json()["meta"]["total"] >= 1
+    assert avec.get_json()["meta"]["total"] == sans.get_json()["meta"]["total"]
+
+
+def test_data_sans_columns_n_expose_pas_objet_normalise(api_client, valid_token_header):
+    client, _ = api_client
+    body = client.get("/api/v1/data?page_size=1", headers=valid_token_header).get_json()
+    assert body["data"], "test.parquet vide ?"
+    assert "objet_normalise" not in body["data"][0]
+
+
+@pytest.mark.parametrize(
+    "query", ["objet_normalise__contains=x", "columns=objet_normalise"]
+)
+def test_data_objet_normalise_inconnu_retourne_400(
+    api_client, valid_token_header, query
+):
+    client, _ = api_client
+    resp = client.get(f"/api/v1/data?{query}", headers=valid_token_header)
     assert resp.status_code == 400
 
 

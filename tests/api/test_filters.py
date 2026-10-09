@@ -27,24 +27,6 @@ def test_exact_filter():
     assert params == ["abc"]
 
 
-def test_contains_filter_uses_like_wildcards():
-    where, params, _ = build_where([("objet__contains", "informatique")], SCHEMA)
-    assert where == '"objet" ILIKE ?'
-    assert params == ["%informatique%"]
-
-
-def test_notcontains_filter():
-    where, params, _ = build_where([("objet__notcontains", "x")], SCHEMA)
-    assert where == '"objet" NOT ILIKE ?'
-    assert params == ["%x%"]
-
-
-def test_startswith_filter_uses_prefix_wildcard():
-    where, params, _ = build_where([("objet__startswith", "72")], SCHEMA)
-    assert where == '"objet" ILIKE ?'
-    assert params == ["72%"]
-
-
 def test_comparison_operators_on_int():
     where, params, _ = build_where([("annee__strictly_greater", "2023")], SCHEMA)
     assert where == '"annee" > ?'

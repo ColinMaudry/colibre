@@ -130,6 +130,13 @@ def test_search_marches_cpv_is_prefix_not_contains():
     assert search_marches(cpv="716")["meta"]["total"] >= 1
 
 
+def test_search_marches_objet_contient_ignore_accents():
+    sans = search_marches(objet_contient="objet")["meta"]["total"]
+    avec = search_marches(objet_contient="ôbjét")["meta"]["total"]
+    assert sans >= 1
+    assert avec == sans
+
+
 def test_search_marches_page_2_is_empty_with_correct_meta():
     result = search_marches(acheteur_id="123", page=2)
     assert result["meta"]["page"] == 2

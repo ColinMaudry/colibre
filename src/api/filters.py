@@ -3,6 +3,8 @@ from datetime import date, datetime
 
 import polars as pl
 
+from src.utils.text_normalization import normalized_target, normalized_term
+
 OPERATORS = {
     "exact",
     "contains",
@@ -170,6 +172,9 @@ def build_where(
             continue
 
         v = _coerce(value, dtype, key)
+        # Colonne comparée par contains/notcontains/startswith : la colonne
+        # précalculée pour les colonnes normalisées (#147), sinon la colonne.
+        text_target = normalized_target(col, f'"{col}"')
 
         op_sql = {
             "exact": "=",
@@ -182,14 +187,14 @@ def build_where(
             where_parts.append(f'"{col}" {op_sql[op]} ?')
             params.append(v)
         elif op == "contains":
-            where_parts.append(f'"{col}" ILIKE ?')
-            params.append(f"%{v}%")
+            where_parts.append(f"{text_target} ILIKE ?")
+            params.append(f"%{normalized_term(col, v)}%")
         elif op == "notcontains":
-            where_parts.append(f'"{col}" NOT ILIKE ?')
-            params.append(f"%{v}%")
+            where_parts.append(f"{text_target} NOT ILIKE ?")
+            params.append(f"%{normalized_term(col, v)}%")
         elif op == "startswith":
-            where_parts.append(f'"{col}" ILIKE ?')
-            params.append(f"{v}%")
+            where_parts.append(f"{text_target} ILIKE ?")
+            params.append(f"{normalized_term(col, v)}%")
         elif op == "differs":
             where_parts.append(f'"{col}" IS DISTINCT FROM ?')
             params.append(v)
