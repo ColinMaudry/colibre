@@ -141,7 +141,8 @@ def test_un_compte_sans_acces_garde_linterrupteur_ferme(
     )
 
 
-CLE_LOCALSTORAGE = "_dash_persistence.tableau-mode-observatoire-persiste"
+# dcc.Store(storage_type="local") range sa donnée sous son id, sans préfixe.
+CLE_LOCALSTORAGE = "tableau-mode-observatoire-persiste"
 
 
 def test_le_mode_observatoire_persiste_apres_rechargement(
