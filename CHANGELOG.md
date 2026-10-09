@@ -1,3 +1,11 @@
+#### 3.3.0
+
+- Ajout d'un aperçu interactif des filtres appliqués au-dessus des tableaux
+- Possiblité de télécharger les données filtrées au format Excel jusqu'à 100 000 lignes et au format CSV au-delà
+- Pour chaque organisme affiché dans un tableau, ajout d'un raccourci permettant de filtrer cet organisme dans la page Tableau ([#146](https://github.com/colinmaudry/colibre/issues/146))
+- Utilisation des montants rationalisés au lieu des montants officiels (parfois aberrants) pour faire la somme des marchés en mode observatoire
+- Amélioration de la compatilité de connexion au connecteur MCP pour certains harnais (ex : pi)
+
 #### 3.2.0
 
 - Possiblité de réordonner les tuiles de l'observatoire (réservé aux abonné·es) ([#107](https://github.com/colinmaudry/colibre/issues/107))
