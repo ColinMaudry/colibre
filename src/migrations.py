@@ -1,17 +1,82 @@
 """
 Migrations de schéma SQLite.
 
-Ajouter une migration : append un tuple (id, sql) à _MIGRATIONS.
+Ajouter une migration : append un tuple (id, migration) à _MIGRATIONS, où
+migration est soit une requête SQL, soit une fonction Python (conn) -> None
+(réécriture de données). La fonction est exécutée entre BEGIN et COMMIT avec
+l'enregistrement de son id ; elle doit tolérer une table absente (base
+fraîche : les init_schema des modules tournent après).
 L'id doit être unique et croissant (convention : NNNN_description).
 apply_pending() est idempotent ; elle peut être appelée à chaque démarrage.
 """
 
+import json
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 from src.auth.db import get_conn
 
-_MIGRATIONS: list[tuple[str, str]] = [
+_OPERATEURS_TEXTE = ("contains", "notContains")
+
+
+def _plus_vers_guillemets(valeur: str) -> str:
+    """Réécrit les mots `a+b` en phrases `"a b"` (le `+` est désormais littéral).
+
+    Un mot qui commence ou finit par `*` (le `+` y était déjà littéral) ou qui
+    contient déjà `"` est laissé tel quel.
+    """
+    mots = []
+    for mot in valeur.split():
+        if (
+            "+" in mot
+            and not mot.startswith("*")
+            and not mot.endswith("*")
+            and '"' not in mot
+        ):
+            mot = '"' + mot.replace("+", " ") + '"'
+        mots.append(mot)
+    return " ".join(mots)
+
+
+def _reecrire_noeud(noeud) -> None:
+    """Parcourt récursivement un AST de filtres et réécrit les valeurs texte."""
+    if not isinstance(noeud, dict):
+        return
+    if noeud.get("t") == "cond":
+        valeur = noeud.get("value")
+        if noeud.get("operator") in _OPERATEURS_TEXTE and isinstance(valeur, str):
+            noeud["value"] = _plus_vers_guillemets(valeur)
+        return
+    for enfant in noeud.get("children") or []:
+        _reecrire_noeud(enfant)
+    _reecrire_noeud(noeud.get("child"))
+
+
+def _migrer_vues_plus(conn: sqlite3.Connection) -> None:
+    """Migration 0017 : les filtres texte des vues sauvegardées passent de
+    `a+b` à `"a b"`. Les vues sans AST JSON (anciennes vues) sont ignorées."""
+    table = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'saved_views'"
+    ).fetchone()
+    if table is None:
+        return
+    for view_id, query in conn.execute("SELECT id, query FROM saved_views").fetchall():
+        try:
+            donnees = json.loads(query)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(donnees, dict) or "ast" not in donnees:
+            continue
+        _reecrire_noeud(donnees["ast"])
+        nouvelle = json.dumps(donnees)
+        if nouvelle != query:
+            conn.execute(
+                "UPDATE saved_views SET query = ? WHERE id = ?", (nouvelle, view_id)
+            )
+
+
+_MIGRATIONS: list[tuple[str, str | Callable[[sqlite3.Connection], None]]] = [
     (
         "0001_add_prix_ht_to_subscriptions",
         "ALTER TABLE subscriptions ADD COLUMN prix_ht REAL",
@@ -100,6 +165,7 @@ _MIGRATIONS: list[tuple[str, str]] = [
         "theme TEXT NOT NULL DEFAULT 'clair', "
         "updated_at TEXT NOT NULL)",
     ),
+    ("0017_saved_views_plus_vers_guillemets", _migrer_vues_plus),
 ]
 
 
@@ -113,25 +179,41 @@ def apply_pending() -> None:
         row[0] for row in conn.execute("SELECT id FROM schema_migrations").fetchall()
     }
     now = datetime.now(timezone.utc).isoformat()
-    for migration_id, sql in _MIGRATIONS:
-        if migration_id not in applied:
+    for migration_id, migration in _MIGRATIONS:
+        if migration_id in applied:
+            continue
+        if callable(migration):
+            # get_conn est en autocommit : transaction explicite pour que la
+            # réécriture et son enregistrement soient atomiques.
+            conn.execute("BEGIN")
             try:
-                conn.execute(sql)
-            except sqlite3.OperationalError as exc:
-                # Sur une DB fraîche (schéma déjà à jour), certaines migrations
-                # sont sans effet : ADD COLUMN → "duplicate column name",
-                # RENAME COLUMN → "no such column", et un ALTER sur une table pas
-                # encore créée → "no such table" (elle sera créée plus tard par
-                # init_schema avec la colonne déjà dans SCHEMA).
-                err = str(exc)
-                if (
-                    "duplicate column name" not in err
-                    and "no such column" not in err
-                    and "no such table" not in err
-                ):
-                    raise
-            conn.execute(
-                "INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)",
-                (migration_id, now),
-            )
+                migration(conn)
+                conn.execute(
+                    "INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)",
+                    (migration_id, now),
+                )
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+            continue
+        try:
+            conn.execute(migration)
+        except sqlite3.OperationalError as exc:
+            # Sur une DB fraîche (schéma déjà à jour), certaines migrations
+            # sont sans effet : ADD COLUMN → "duplicate column name",
+            # RENAME COLUMN → "no such column", et un ALTER sur une table pas
+            # encore créée → "no such table" (elle sera créée plus tard par
+            # init_schema avec la colonne déjà dans SCHEMA).
+            err = str(exc)
+            if (
+                "duplicate column name" not in err
+                and "no such column" not in err
+                and "no such table" not in err
+            ):
+                raise
+        conn.execute(
+            "INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)",
+            (migration_id, now),
+        )
     conn.commit()

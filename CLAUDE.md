@@ -108,6 +108,8 @@ _MIGRATIONS = [
 - Les migrations appliquées sont tracées dans la table `schema_migrations`
 - `apply_pending()` est idempotent : sans effet si la migration est déjà enregistrée, et tolère le cas où la colonne existe déjà dans le schéma (DB fraîche)
 
+Une migration peut aussi être une fonction Python `(conn) -> None` (réécriture de données) ; `apply_pending` l'exécute entre `BEGIN` et `COMMIT` avec son enregistrement. Elle doit tolérer une table absente (base fraîche : `init_schema` des modules tourne après).
+
 ### Deployment
 
 - `main` branch → manual deploy to colibre.fr via GitHub Actions
