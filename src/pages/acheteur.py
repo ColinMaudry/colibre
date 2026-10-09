@@ -26,6 +26,7 @@ from src.utils.data import DF_ACHETEURS, get_annuaire_data, get_departement_regi
 from src.utils.entity_grid import entity_scope, register_entity_grid_callbacks
 from src.utils.frontend import DROPDOWN_LABELS_FR, EXCEL_MAX_ROWS, get_button_properties
 from src.utils.seo import META_CONTENT, make_org_jsonld
+from src.utils.suivi import emettre
 from src.utils.table import (
     format_number,
     get_default_hidden_columns,
@@ -41,7 +42,6 @@ from src.utils.top_org_grid import (
     scope_key,
     top_org_grid,
 )
-from src.utils.tracking import track_download
 
 
 def get_title(acheteur_id: str | None = None) -> str:
@@ -477,8 +477,8 @@ def download_acheteur_data(
         def to_bytes(buffer):
             write_styled_excel(df_to_download, buffer, worksheet=worksheet)
 
+    emettre("Acheteur", "telechargement", extension, df_to_download.height)
     date = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    track_download("/acheteurs/")
     return dcc.send_bytes(to_bytes, filename=f"decp_{acheteur_nom}_{date}.{extension}")
 
 

@@ -76,20 +76,6 @@ def track_search(query, category):
     )
 
 
-def track_download(path):
-    if not path:
-        return
-    page = "https://colibre.fr" + path
-    _envoyer_async(
-        {
-            "rec": "1",
-            "url": page,
-            "download": page,
-            **_horodatage(),
-        }
-    )
-
-
 def track_mcp_tool(tool_name: str, query: str | None = None) -> None:
     """Enregistre un appel d'outil MCP dans Matomo (best-effort).
 

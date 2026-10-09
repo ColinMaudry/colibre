@@ -49,6 +49,7 @@ from src.utils.query_ast import (
     filtermodel_to_ast,
 )
 from src.utils.seo import META_CONTENT
+from src.utils.suivi import emettre
 from src.utils.table import (
     format_number,
     get_default_hidden_columns,
@@ -58,7 +59,7 @@ from src.utils.table import (
     write_styled_excel,
 )
 from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
-from src.utils.tracking import track_download, track_search
+from src.utils.tracking import track_search
 
 # L'URL de l'API data.gouv.fr redirige toujours vers la dernière version
 # publiée du CSV complet des DECP (mise à jour quotidienne) : pas besoin de
@@ -693,13 +694,15 @@ register_filter_pills_callbacks("tableau", "tableau_grid", clear_active_view=Tru
     Input("btn-download-data", "n_clicks"),
     State("tableau_grid", "filterModel"),
     State("tableau_grid", "columnState"),
+    State("tableau-total", "data"),
     prevent_initial_call=True,
 )
-def download_data(n_clicks, filter_model, column_state):
+def download_data(n_clicks, filter_model, column_state, total=None):
     if not filter_model:
         # Sans filtre, le bouton pointe déjà (via href) vers le CSV complet
         # de data.gouv.fr — un clic ne doit pas en plus déclencher la
         # génération d'un fichier de plusieurs millions de lignes ici.
+        emettre("Tableau", "telechargement", "csv-datagouv", total or 0)
         return no_update
 
     from src.utils.grid import export_dataframe
@@ -710,7 +713,6 @@ def download_data(n_clicks, filter_model, column_state):
         if c.get("sort")
     ]
     hidden_columns = [c["colId"] for c in (column_state or []) if c.get("hide")]
-    track_search(json.dumps(filter_model), "tab download")
     df = export_dataframe(filter_model, sort_model, hidden_columns)
 
     if df.height > EXCEL_MAX_ROWS:
@@ -724,8 +726,8 @@ def download_data(n_clicks, filter_model, column_state):
         def to_bytes(buffer):
             write_styled_excel(df, buffer)
 
+    emettre("Tableau", "telechargement", extension, df.height)
     date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    track_download("/tableau")
     return dcc.send_bytes(to_bytes, filename=f"decp_{date}.{extension}")
 
 

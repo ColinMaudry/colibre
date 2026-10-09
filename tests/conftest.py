@@ -99,6 +99,17 @@ def test_data():
     _cleanup_db_artifacts()
 
 
+@pytest.fixture(autouse=True)
+def _suivi_hors_callback(request, monkeypatch):
+    """Les callbacks appelés directement (hors contexte Dash) émettent un
+    événement de suivi via `set_props`, qui exige un contexte de callback.
+    On le neutralise ; un test qui veut capturer les événements remplace à
+    nouveau `src.utils.suivi.set_props`. Les tests navigateur gardent le vrai
+    `set_props`, le serveur Dash tournant dans le même processus."""
+    if "dash_duo" not in request.fixturenames:
+        monkeypatch.setattr("src.utils.suivi.set_props", lambda *a, **kw: None)
+
+
 def pytest_collection_modifyitems(items):
     """Marque `selenium` tout test qui demande un navigateur.
 

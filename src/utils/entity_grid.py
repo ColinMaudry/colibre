@@ -247,17 +247,12 @@ def register_entity_grid_callbacks(org_type: str) -> None:
         import datetime as _dt
 
         from src.utils.frontend import EXCEL_MAX_ROWS
+        from src.utils.suivi import emettre
         from src.utils.table import write_csv, write_styled_excel
 
         entity_id = (pathname or "").split("/")[-1]
         filter_model = (filter_models or [None])[0]
         column_state = (column_states or [None])[0]
-        if filter_model:
-            import json
-
-            from src.utils.tracking import track_search
-
-            track_search(json.dumps(filter_model), f"{org_type} download")
         df = export_entity_dataframe(
             org_type, entity_id, year, filter_model, column_state
         )
@@ -273,6 +268,7 @@ def register_entity_grid_callbacks(org_type: str) -> None:
             def to_bytes(buffer):
                 write_styled_excel(df, buffer)
 
+        emettre(org_type.capitalize(), "telechargement_filtre", extension, df.height)
         date = _dt.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         label = nom if isinstance(nom, str) else org_type
         return dcc.send_bytes(

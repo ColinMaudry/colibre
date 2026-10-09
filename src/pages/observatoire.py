@@ -44,10 +44,10 @@ from src.utils.frontend import (
     get_enum_values_as_dict,
 )
 from src.utils.seo import META_CONTENT
+from src.utils.suivi import emettre
 from src.utils.table import format_number, write_csv, write_styled_excel
 from src.utils.table_sql import dashboard_filters_to_sql
 from src.utils.top_org_grid import GRID_TYPE, fetch_top_org_page, scope_key
-from src.utils.tracking import track_download
 
 NAME = "Observatoire"
 
@@ -697,8 +697,8 @@ def download_observatoire(_n_clicks, filter_params):
         def to_bytes(buffer):
             write_styled_excel(dff, buffer)
 
+    emettre("Observatoire", "telechargement", extension, dff.height)
     date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    track_download("/observatoire")
     return dcc.send_bytes(to_bytes, filename=f"decp_observatoire_{date}.{extension}")
 
 
