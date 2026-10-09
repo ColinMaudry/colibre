@@ -725,7 +725,12 @@ app.clientside_callback(
     """
     function(theme) {
         // Le thème s'applique côté serveur (<html>, figures) : on recharge.
-        if (theme) { window.location.reload(); }
+        if (theme) {
+            if (window.colibreSuivi) {
+                window.colibreSuivi.evenement("Interface", "theme", theme);
+            }
+            window.location.reload();
+        }
         return window.dash_clientside.no_update;
     }
     """,

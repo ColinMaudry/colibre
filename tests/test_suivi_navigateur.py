@@ -2,11 +2,17 @@
 
 import time
 
+import pytest
 from dash.testing.composite import DashComposite
 from selenium.webdriver import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
 from tests.helpers import appels_paq, installer_espion_paq
+from tests.test_tableau_mode_observatoire_abonne import (  # noqa: F401
+    _ouvrir_le_tableau,
+    _se_connecter,
+    compte_abonne,
+)
 
 # Anti-rebond de 3 s des filtres de grille, plus une marge.
 _ATTENTE_ANTI_REBOND = 4
@@ -142,3 +148,82 @@ def test_filtre_puis_reinitialisation_rapide_n_envoie_rien(dash_duo: DashComposi
     WebDriverWait(dash_duo.driver, 2).until(lambda d: d.execute_script(modele) == {})
     time.sleep(_ATTENTE_ANTI_REBOND)
     assert _filtres_envoyes(dash_duo) == []
+
+
+def _evenements(dash_duo: DashComposite, action: str) -> list[list]:
+    return [a for a in appels_paq(dash_duo.driver, "trackEvent") if a[2] == action]
+
+
+@pytest.mark.usefixtures("compte_abonne")
+def test_bascule_manuelle_du_mode_envoie_un_evenement(dash_duo: DashComposite):
+    from src.app import app
+
+    installer_espion_paq(dash_duo.driver)
+    dash_duo.start_server(app)
+    _se_connecter(dash_duo)
+    _ouvrir_le_tableau(dash_duo)
+    dash_duo.find_element("#tableau-mode-observatoire").click()
+    WebDriverWait(dash_duo.driver, 4).until(lambda d: _evenements(dash_duo, "mode"))
+    assert _evenements(dash_duo, "mode") == [
+        ["trackEvent", "Tableau", "mode", "observatoire"]
+    ]
+
+    # Le rechargement restaure le mode mémorisé : ce n'est pas un geste.
+    dash_duo.driver.refresh()
+    dash_duo.wait_for_element(".ag-root", timeout=10)
+    dash_duo.wait_for_element("#tableau-mode-wrapper.mode-observatoire", timeout=10)
+    time.sleep(2)
+    assert _evenements(dash_duo, "mode") == []
+
+
+def test_restauration_du_mode_sans_abonnement_n_envoie_rien(dash_duo: DashComposite):
+    _demarrer(dash_duo, "/tableau")
+    dash_duo.wait_for_element(".ag-root", timeout=10)
+    dash_duo.driver.execute_script(
+        "window.localStorage.setItem('tableau-mode-observatoire-persiste', 'true');"
+    )
+    dash_duo.driver.refresh()
+    dash_duo.wait_for_element(".ag-center-cols-container .ag-row", timeout=10)
+    time.sleep(2)
+    assert _evenements(dash_duo, "mode") == []
+
+
+@pytest.mark.usefixtures("compte_abonne")
+def test_deplacement_d_une_tuile_envoie_un_evenement(dash_duo: DashComposite):
+    from src.app import app
+
+    installer_espion_paq(dash_duo.driver)
+    # Le drag & drop n'est armé que sur un écran d'au moins 768 px de large.
+    dash_duo.driver.set_window_size(1400, 1000)
+    dash_duo.start_server(app)
+    _se_connecter(dash_duo)
+    dash_duo.wait_for_page(f"{dash_duo.server_url}/observatoire")
+    dash_duo.wait_for_element("[data-observatoire-cards]", timeout=20)
+    WebDriverWait(dash_duo.driver, 10).until(
+        lambda d: d.execute_script(
+            "return document.querySelector('[data-observatoire-cards]')"
+            ".parentElement.dataset.dragEnabled === 'true';"
+        )
+    )
+    premiere = dash_duo.driver.execute_script(
+        """
+        const liste = document.querySelector("[data-observatoire-cards]").parentElement;
+        const cards = Array.from(liste.children)
+            .filter((el) => el.classList.contains("observatoire-card"));
+        const [source, cible] = cards;
+        const dt = new DataTransfer();
+        const lancer = (el, type) => el.dispatchEvent(
+            new DragEvent(type, {bubbles: true, cancelable: true, dataTransfer: dt})
+        );
+        lancer(source, "dragstart");
+        lancer(cible, "dragover");
+        lancer(cible, "drop");
+        lancer(source, "dragend");
+        return Array.from(source.classList)
+            .find((c) => c.startsWith("observatoire-card--"))
+            .slice("observatoire-card--".length);
+        """
+    )
+    assert _evenements(dash_duo, "tuile_deplacee") == [
+        ["trackEvent", "Observatoire", "tuile_deplacee", premiere, 2]
+    ]

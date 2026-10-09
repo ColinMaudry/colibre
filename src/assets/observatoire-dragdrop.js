@@ -55,6 +55,31 @@
     window.dash_clientside.set_props(storeId, { data: order });
   }
 
+  // Suivi Matomo (issue #149) : quelle tuile, à quel rang (1-based) parmi
+  // les cards. Appelé dans `drop`, avant que `dragend` ne remette dragSrc à
+  // null.
+  function suivreDeplacement(marker, list, card) {
+    if (!window.colibreSuivi) return;
+    var categorie =
+      marker.getAttribute("data-card-order-store") ===
+      "tableau-card-order-nouveau"
+        ? "Tableau"
+        : "Observatoire";
+    var position =
+      Array.prototype.slice
+        .call(list.children)
+        .filter(function (el) {
+          return el.classList.contains(CARD_CLASS);
+        })
+        .indexOf(card) + 1;
+    window.colibreSuivi.evenement(
+      categorie,
+      "tuile_deplacee",
+      cardId(card),
+      position
+    );
+  }
+
   function enable(marker) {
     if (isTouchOrSmall()) return;
 
@@ -126,6 +151,7 @@
 
       clearHighlights();
       pushOrder(marker, list);
+      suivreDeplacement(marker, list, dragSrc);
     });
   }
 

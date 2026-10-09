@@ -1295,14 +1295,24 @@ clientside_callback(
 )
 
 
+# Seule une bascule manuelle est suivie : la restauration au chargement
+# renvoie la valeur déjà stockée, et un interrupteur désactivé (non-abonné)
+# n'est jamais actionné par l'utilisateur.
 clientside_callback(
     """
-    function(value) {
+    function(value, stocke, desactive) {
+        if (!desactive && value !== (stocke === true) && window.colibreSuivi) {
+            window.colibreSuivi.evenement(
+                "Tableau", "mode", value ? "observatoire" : "lignes"
+            );
+        }
         return value;
     }
     """,
     Output("tableau-mode-observatoire-persiste", "data"),
     Input("tableau-mode-observatoire", "value"),
+    State("tableau-mode-observatoire-persiste", "data"),
+    State("tableau-mode-observatoire", "disabled"),
     prevent_initial_call=True,
 )
 
