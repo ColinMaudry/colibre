@@ -3,7 +3,8 @@
 **Pour les abonné•es**
 
 - Ajout de la possibilité de saisir des requêtes booléennes complexes dans les filtres de colonnes et le champ objet de l'observatoire (ex : "maitrise d'oeuvre" OU archi). Tout est dans le mode d'emplo. Leur fonctionnement est expliqué dans le mode d'emploi de la page [Tableau](https://colibre.fr/tableau).
-- Limite du nombre de résultats par page amenée à 200 dans l'API et le connecteur MCP
+- Simplification de la procédure pour configurer le connecteur IA avec un agent (Claude, Mistral, Gemini, etc.)
+- Limite du nombre de résultats par page amenée à 200 dans l'API et le connecteur IA
 
 **Pour tout le monde**
 
