@@ -372,7 +372,7 @@ def _layout(a_un_abonnement: bool) -> list:
 
                 Pour afficher plus de colonnes, cliquez sur le bouton **Colonnes** et cochez les colonnes à afficher.
 
-                ##### Vues sauvegardées (abonnés)
+                ##### Vues sauvegardées (abonné·es)
 
                 Une vue est un ensemble de filtres, de tris et de colonnes affichées que vous avez appliqués. Si vous êtes abonné, le bouton **Sauvegarder la vue** vous permet d'enregistrer la configuration actuelle sous un nom, et le menu **Mes vues** de la rappeler d'un clic plus tard.
 

@@ -7,6 +7,7 @@ parenthèses et phrases entre guillemets. La saisie est toujours réparée :
 
 import re
 from dataclasses import dataclass, field
+from types import NoneType
 
 from unidecode import unidecode
 
@@ -329,7 +330,7 @@ def _compiler(noeud, colonne: str, cible: str, params: list) -> str:
 
 
 def en_sql(
-    expression: Expression, colonne: str, col_is_date: bool = False
+    expression: Expression or NoneType, colonne: str, col_is_date: bool = False
 ) -> tuple[str, list]:
     """Clause SQL paramétrée du filtre _contient_ : la garde « non vide »
     suivie de l'expression compilée, chaque feuille étant un `ILIKE ?` sur

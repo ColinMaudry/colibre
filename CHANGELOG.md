@@ -1,12 +1,17 @@
-#### 3.3.0
+#### 3.3.0 (12 octobre 2026)
+
+**Pour les abonné•es**
+
+- Ajout de la possibilité de saisir des requêtes booléennes complexes dans les filtres de colonnes et le champ objet de l'observatoire (ex : "maitrise d'oeuvre" OU archi). Tout est dans le mode d'emplo. Leur fonctionnement est expliqué dans le mode d'emploi de la page [Tableau](https://colibre.fr/tableau).
+- Limite du nombre de résultats par page amenée à 200 dans l'API et le connecteur MCP
+
+**Pour tout le monde**
 
 - Ajout d'un aperçu interactif des filtres appliqués au-dessus des tableaux ([#148](https://github.com/colinmaudry/colibre/issues/148))
 - Dans les tableaux les filtres sur la colonne Objet sont insensibles à la casse, aux accents et aux ligatures ([#147](https://github.com/colinmaudry/colibre/issues/147))
 - Possiblité de télécharger les données filtrées au format Excel jusqu'à 100 000 lignes et au format CSV au-delà
+- Utilisation des montants rationalisés au lieu des montants officiels (parfois aberrants) pour faire la somme des marchés dans l'[observatoire](https://colibre.fr/observatoire) ([méthodologie de calcul](https://github.com/ColinMaudry/decp-processing/blob/main/docs/explications_montants_anormaux.md))
 - Pour chaque organisme affiché dans un tableau, ajout d'un raccourci permettant de filtrer cet organisme dans la page Tableau ([#146](https://github.com/colinmaudry/colibre/issues/146))
-- Utilisation des montants rationalisés au lieu des montants officiels (parfois aberrants) pour faire la somme des marchés en mode observatoire
-- Amélioration de la compatibilité de connexion au connecteur MCP pour certains harnais (ex : pi)
-- Limite du nombre de résultats par page amenée à 200 dans l'API et le connecteur MCP
 
 #### 3.2.0
 
