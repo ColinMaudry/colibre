@@ -63,7 +63,7 @@ def test_menu_liste_toutes_les_sections_pour_un_abonne(monkeypatch):
     for href in (
         "/compte/vues",
         "/compte/roadmap",
-        "/compte/mcp",
+        "/compte/ia",
         "/compte/abonnement",
         "/compte/admin",
     ):
@@ -75,7 +75,7 @@ def test_menu_masque_les_sections_reservees_sans_acces(monkeypatch):
     rendu = str(_menu(monkeypatch, has_subscription=False))
     assert "/compte/abonnement" in rendu
     assert "/compte/admin" in rendu
-    for href in ("/compte/vues", "/compte/roadmap", "/compte/mcp"):
+    for href in ("/compte/vues", "/compte/roadmap", "/compte/ia"):
         assert href not in rendu
 
 

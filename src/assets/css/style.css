@@ -1117,6 +1117,13 @@ input[type="number"] {
 .roadmap-vote-list input[type="text"] {
 }
 
+/* Connecteur IA prompt */
+.mcp_prompt {
+  width: 100%;
+  height: 110px;
+  padding: 4px;
+}
+
 /* --- Bascule desktop / mobile au point de rupture 768 px --- */
 
 @media (max-width: 768px) {

@@ -2,21 +2,19 @@ def test_section_connecteur_mcp_present():
     from src.pages._compte_shell import SECTIONS
 
     keys = {s["key"]: s for s in SECTIONS}
-    assert "mcp" in keys
-    assert keys["mcp"]["label"] == "Connecteur MCP"
-    assert keys["mcp"]["href"] == "/compte/mcp"
-    assert keys["mcp"]["require_subscription"] is True
+    assert "ia" in keys
+    assert keys["ia"]["label"] == "Connecteur IA"
+    assert keys["ia"]["href"] == "/compte/ia"
+    assert keys["ia"]["require_subscription"] is True
 
 
 def test_page_module_registers_and_builds_client_instructions():
     # importe l'app pour la découverte use_pages en contexte propre
     from src.app import app  # noqa: F401
-    from src.pages.compte import mcp as mcp_page
+    from src.pages.compte import ia as ia_page
 
     # helper pur : construit les 4 blocs d'instructions clients
-    blocks = mcp_page.client_instructions(
-        "https://colibre.fr/_mcp", "colibre_TESTTOKEN"
-    )
+    blocks = ia_page.client_instructions("https://colibre.fr/_mcp", "colibre_TESTTOKEN")
     text = str(blocks)
     assert "colibre_TESTTOKEN" in text
     assert "https://colibre.fr/_mcp" in text
@@ -26,7 +24,7 @@ def test_page_module_registers_and_builds_client_instructions():
 
 def test_client_instructions_include_oauth_apps():
     from src.app import app  # noqa: F401
-    from src.pages.compte.mcp import client_instructions
+    from src.pages.compte.ia import client_instructions
 
     comp = client_instructions("https://colibre.fr/_mcp", "<VOTRE_JETON>")
     titles = _collect_titles(comp)
@@ -36,7 +34,7 @@ def test_client_instructions_include_oauth_apps():
 
 def test_prompt_tips_mentions_columns_and_examples():
     from src.app import app  # noqa: F401
-    from src.pages.compte.mcp import prompt_tips
+    from src.pages.compte.ia import prompt_tips
 
     text = str(prompt_tips())
     assert "Morbihan" in text  # un exemple de prompt concret
@@ -46,7 +44,7 @@ def test_prompt_tips_mentions_columns_and_examples():
 
 def test_token_row_has_copy_button_when_token_available():
     from src.app import app  # noqa: F401
-    from src.pages.compte.mcp import _token_row
+    from src.pages.compte.ia import _token_row
 
     text = str(
         _token_row(
@@ -66,7 +64,7 @@ def test_token_row_has_copy_button_when_token_available():
 
 def test_token_row_no_copy_button_when_token_unavailable():
     from src.app import app  # noqa: F401
-    from src.pages.compte.mcp import _token_row
+    from src.pages.compte.ia import _token_row
 
     text = str(
         _token_row(

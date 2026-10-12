@@ -1,6 +1,8 @@
 # colibre
 
-colibre est une plateforme permettant d'explorer, filtrer et visualiser les données des marés publics français. Elle est alimentée par des données publiées en Open Data et propose également une API REST JSON accessible sur abonnement (contacter <colin@colmo.tech>).
+colibre est une plateforme permettant d'explorer, filtrer et visualiser les données des marchés publics
+français. Elle est alimentée par des données publiées en Open Data et propose également une API REST JSON
+ainsi qu'un connecteur MCP, les deux accessibles via des abonnements distincts.
 
 ## Schéma des données
 
@@ -13,9 +15,9 @@ Les données sont publiées en Open Data aux formats Parquet et CSV :
 - Parquet : <https://www.data.gouv.fr/api/1/datasets/r/11cea8e8-df3e-4ed1-932b-781e2635e432>
 - CSV : <https://www.data.gouv.fr/api/1/datasets/r/22847056-61df-452d-837d-8b8ceadbfc52>
 
-## Serveur MCP
+## Connecteur MCP
 
-Les abonné·es à colibre peuvent utiliser une série d'outils pour agents IA via le serveur MCP, exposé à l'adresse <https://colibre.fr/_mcp>.
+Les abonné·es à colibre peuvent utiliser une série d'outils pour agents IA via le connecteur MCP, exposé à l'adresse <https://colibre.fr/_mcp>. L'abonnement peut se faire depuis [cette page](https://colibre.fr/projet/abonnement).
 
 ## API
 

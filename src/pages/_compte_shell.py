@@ -18,9 +18,9 @@ SECTIONS = [
         "require_subscription": True,
     },
     {
-        "key": "mcp",
-        "label": "Connecteur MCP",
-        "href": "/compte/mcp",
+        "key": "ia",
+        "label": "Connecteur IA",
+        "href": "/compte/ia",
         "require_subscription": True,
     },
     {

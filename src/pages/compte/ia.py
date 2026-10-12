@@ -10,9 +10,9 @@ from src.pages._compte_shell import account_guard, account_shell
 
 register_page(
     __name__,
-    path="/compte/mcp",
-    title="Connecteur MCP | colibre",
-    name="Connecteur MCP",
+    path="/compte/ia",
+    title="Connecteur IA | colibre",
+    name="Connecteur IA",
     description="Connectez votre agent IA aux données colibre via le protocole MCP.",
 )
 
@@ -127,18 +127,7 @@ def prompt_tips():
     ]
     return html.Div(
         [
-            html.P(
-                "L'assistant découvre seul les outils disponibles : décrivez "
-                "votre besoin en langage naturel. Quelques exemples :"
-            ),
             html.Ul([html.Li(html.Em(p)) for p in exemples]),
-            html.P(
-                "Astuce colonnes : demandez à l'assistant de vous proposer les "
-                "colonnes disponibles pour choisir précisément ce qui s'affiche, si possible sous la forme d'une liste à cocher "
-                "(les colonnes par défaut restent pré-sélectionnées). Chaque "
-                "marché renvoyé inclut dans tous les cas un lien direct vers sa fiche sur colibre.",
-                className="text-muted",
-            ),
         ]
     )
 
@@ -183,7 +172,7 @@ def _token_row(row: dict):
         actions.append(
             html.Form(
                 method="POST",
-                action=f"/compte/mcp/revoquer/{row['id']}",
+                action=f"/compte/ia/revoquer/{row['id']}",
                 className="d-inline",
                 children=[
                     _csrf(f"revoke-{row['id']}"),
@@ -209,23 +198,23 @@ def _token_row(row: dict):
 
 
 def layout(**_):
-    guard = account_guard("/compte/mcp", require_subscription=True)
+    guard = account_guard("/compte/ia", require_subscription=True)
     if guard is not None:
         return guard
 
     if not MCP_ENABLED:
         contenu = html.Div(
             [
-                html.H2("Connecteur MCP"),
+                html.H2("Connecteur IA"),
                 dbc.Alert(
-                    "Le connecteur MCP sera bientôt disponible. Revenez prochainement.",
+                    "Le connecteur IA sera bientôt disponible. Revenez prochainement.",
                     color="info",
                 ),
             ]
         )
         return account_shell("mcp", contenu)
 
-    url = _mcp_url()
+    # url = _mcp_url()
     new_token = session.pop("mcp_new_token", None)
 
     alerts = []
@@ -278,39 +267,54 @@ def layout(**_):
 
     create_form = html.Form(
         method="POST",
-        action="/compte/mcp/creer",
+        action="/compte/ia/creer",
         className="mb-4",
         children=[
             _csrf("mcp-create"),
             dbc.Label("Nom du jeton (ex. « Claude sur mon portable »)"),
-            dbc.Input(type="text", name="label", required=True, className="mb-2"),
+            dbc.Input(
+                type="text",
+                name="label",
+                required=True,
+                className="mb-2",
+                style={"width": "300px"},
+            ),
             dbc.Button("Générer un jeton", type="submit", color="secondary"),
         ],
     )
 
-    snippet_token = new_token or _TOKEN_PLACEHOLDER
+    # snippet_token = new_token or _TOKEN_PLACEHOLDER
     contenu = html.Div(
         [
-            html.H2("Connecteur MCP"),
+            html.H2("Connecteur IA"),
             html.P(
-                "Un connecteur MCP est une interface proposée par un outil (ici colibre) pour faciliter "
+                "Un connecteur IA est une interface proposée par un outil (ici colibre) pour faciliter "
                 "son interrogation par un agent IA tel que Mistral, Claude ou ChatGPT. "
                 "Dans le cas de colibre, cela vous permet de poser des questions très précises aux données, "
-                "et d'obtenir une réponse rapide, précise et peu couteuse."
+                "et d'obtenir une réponse rapide, précise et peu coûteuse en tokens. Exemples de questions :"
             ),
+            prompt_tips(),
             html.P(
-                "L'utilisation de cette fonctionnalité étant liée à un abonnement, vous devez d'abord vous authentifiez auprès "
-                "dans les options de votre agent IA. La méthode varie selon les outils."
+                "L'utilisation de cette fonctionnalité étant liée à un abonnement colibre, vous devez d'abord vous "
+                "authentifier pour donner l'accès votre agent IA. La méthode varie selon les outils, il est donc "
+                "difficile de décrire la procédure pour chaque outil. "
+                "Le plus simple est de donner ce prompt à votre agent, et de suivre ses instructions :"
             ),
-            html.H4("Connecter un client", className="mt-4"),
-            client_instructions(url, snippet_token),
+            html.Textarea(
+                "Je souhaite consulter les données mises à disposition par le site colibre.fr et "
+                "accessibles via le connecteur exposé à l'URL https://colibre.fr/_mcp.\n"
+                "Je dispose d'un abonnnement colibre, donc je peux soit (par ordre de préférence)\n"
+                "- procéder à l'authentification dans mon navigateur\n"
+                "- fournir un jeton d'authentification",
+                className="mcp_prompt",
+            ),
+            # html.H4("Connecter un client", className="mt-4"),
+            # client_instructions(url, snippet_token),
             *alerts,
             html.H4("Générer un jeton d'authentification", className="mt-3"),
             create_form,
             html.H4("Mes jetons", className="mt-4"),
             table,
-            html.H4("Exemples de prompts", className="mt-4"),
-            prompt_tips(),
         ]
     )
     return account_shell("mcp", contenu)

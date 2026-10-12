@@ -226,9 +226,9 @@ from src.roadmap import db as roadmap_db  # noqa: E402
 
 roadmap_db.init_schema()
 
-from src.mcp.account import mcp_account_bp  # noqa: E402
+from src.mcp.account import ia_account_bp  # noqa: E402
 
-app.server.register_blueprint(mcp_account_bp)
+app.server.register_blueprint(ia_account_bp)
 
 # Pages SEO rendues côté serveur (voir src/seo/routes.py). Enregistrées avant
 # init_not_found pour être de vraies règles Flask, donc hors du catch-all Dash.

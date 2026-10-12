@@ -19,9 +19,7 @@ def _resource_metadata_url() -> str:
 
 
 def _unauthorized():
-    resp = jsonify(
-        {"error": "unauthorized", "message": "Jeton MCP absent ou invalide."}
-    )
+    resp = jsonify({"error": "unauthorized", "message": "Jeton absent ou invalide."})
     resp.status_code = 401
     resp.headers["WWW-Authenticate"] = (
         f'Bearer realm="colibre-mcp", resource_metadata="{_resource_metadata_url()}"'
@@ -33,7 +31,7 @@ def _forbidden():
     resp = jsonify(
         {
             "error": "no_active_subscription",
-            "message": "Un abonnement colibre actif est requis pour le connecteur MCP.",
+            "message": "Un abonnement colibre actif est requis pour le connecteur IA.",
         }
     )
     resp.status_code = 403
