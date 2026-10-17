@@ -6,6 +6,7 @@ from unittest.mock import patch
 import dash
 import openpyxl
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
 import src.app  # noqa: F401  # instancie l'app → register_page()
@@ -276,8 +277,9 @@ def test_vue_partagee_operateurs_non_abonne(dash_duo, users_db_path):
 
     def _bandeau_visible(_d):
         # Nouvelle tentative tant que le bandeau n'est pas là : le re-rendu qui
-        # suit l'application de la vue peut invalider le champ.
-        dash_duo.find_element(champ).send_keys("z")
+        # suit l'application de la vue peut invalider le champ. Entrée valide
+        # la saisie quand le filtre ne s'applique qu'à la validation.
+        dash_duo.find_element(champ).send_keys("z", Keys.ENTER)
         return bool(
             dash_duo.driver.find_elements(
                 By.CSS_SELECTOR, "#tableau-filter-pills .filter-pills-banniere"
