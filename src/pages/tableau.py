@@ -716,7 +716,12 @@ def update_meta(total, total_unique, filter_model):
     return nb_rows, download_disabled, download_text, download_title, None
 
 
-register_filter_pills_callbacks("tableau", "tableau_grid", clear_active_view=True)
+register_filter_pills_callbacks(
+    "tableau",
+    "tableau_grid",
+    clear_active_view=True,
+    vue_resolution_id="vue-resolution",
+)
 
 
 @callback(
