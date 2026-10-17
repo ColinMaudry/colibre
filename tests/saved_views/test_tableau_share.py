@@ -1,11 +1,15 @@
+import base64
+import io
 import json
 from unittest.mock import patch
 
 import dash
+import openpyxl
 from selenium.webdriver.support.ui import WebDriverWait
 
 import src.app  # noqa: F401  # instancie l'app → register_page()
 from src.auth import db as auth_db
+from src.db import schema
 from src.pages import tableau
 from src.saved_views import db as saved_views_db
 from src.saved_views import resolve
@@ -191,3 +195,43 @@ def test_open_shared_view_applies_and_shows_box(dash_duo, users_db_path):
         return display == "none"
 
     WebDriverWait(dash_duo.driver, 15).until(_box_hidden)
+
+
+# --- Opérateurs booléens d'une vue ouverte, pour un non-abonné (#97) -------
+# tests/test.parquet n'a qu'une ligne (objet « Objet test ») : `test OU zzz`
+# la trouve avec les opérateurs, pas sans (les trois mots sont alors exigés).
+
+
+def _vue_booleenne(monkeypatch, ast=None):
+    monkeypatch.setattr(tableau, "current_user_has_subscription", lambda: False)
+    saved_views_db.init_schema()
+    ast = ast or And([Condition("objet", "contains", "test OU zzz")])
+    query = json.dumps({"ast": ast_to_dict(ast), "columnState": []})
+    token = saved_views_db.upsert(_make_user(), "tableau", "Ma vue", query)
+    return resolve.resolve_vue_param(token, schema)
+
+
+def test_get_rows_vue_non_abonne(monkeypatch, users_db_path):
+    res = _vue_booleenne(monkeypatch)
+    req = {"filterModel": res["filter_model"], "startRow": 0, "endRow": 100}
+
+    rows, total, _ = tableau.get_rows_tableau(req, res)
+    assert rows["rowCount"] == 1 and total == 1
+
+    modifie = {"objet": {**res["filter_model"]["objet"], "filter": "test OU zzzz"}}
+    _, total, _ = tableau.get_rows_tableau({**req, "filterModel": modifie}, res)
+    assert total == 0
+
+    _, total, _ = tableau.get_rows_tableau(req, None)
+    assert total == 0
+
+
+def test_export_vue_non_abonne(monkeypatch, users_db_path):
+    res = _vue_booleenne(monkeypatch)
+
+    out = tableau.download_data(1, res["filter_model"], [], 1, res)
+
+    assert out["filename"].endswith(".xlsx")
+    contenu = base64.b64decode(out["content"])
+    # En-tête + la ligne ; sans l'exception, l'export serait vide.
+    assert openpyxl.load_workbook(io.BytesIO(contenu)).active.max_row == 2
