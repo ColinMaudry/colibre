@@ -1,3 +1,7 @@
+#### 3.4.0
+
+- Dans les tableaux, les filtres de colonnes ne s'appliquent plus à chaque caractère tapé : il faut valider avec Entrée (ou le bouton « Appliquer » du menu du filtre)
+
 #### 3.3.0 (12 octobre 2026)
 
 **Pour les abonné•es**

@@ -18,7 +18,7 @@ import polars as pl
 from dash import no_update
 
 from src.db import aggregate_marches, count_aggregate, schema
-from src.figures import AG_GRID_LOCALE_FR, AG_GRID_THEME
+from src.figures import AG_GRID_FILTER_PARAMS, AG_GRID_LOCALE_FR, AG_GRID_THEME
 from src.utils import logger
 from src.utils.cache import cache
 from src.utils.data import DATA_SCHEMA
@@ -330,7 +330,11 @@ def top_org_grid(context: str, org_type: str, scope: str, extra_columns=()):
             },
             "theme": AG_GRID_THEME,
         },
-        defaultColDef={"resizable": True, "floatingFilter": True},
+        defaultColDef={
+            "resizable": True,
+            "floatingFilter": True,
+            "filterParams": AG_GRID_FILTER_PARAMS,
+        },
         style={"height": GRID_HEIGHT, "width": "100%"},
         persistence=False,
         columnSize="responsiveSizeToFit",

@@ -97,6 +97,9 @@ def test_002_filter_persistence(dash_duo: DashComposite):
         filter_input.send_keys(
             "zzz_no_match"
         )  # valeur quelconque, on teste la persistance
+        filter_input.send_keys(
+            Keys.ENTER
+        )  # le filtre n'est appliqué qu'à la validation
         # Attendre que le filtre soit réellement appliqué (la grille se vide :
         # "zzz_no_match" ne matche aucun "objet") AVANT de re-naviguer. Sinon, on
         # peut quitter la page avant que le callback de filtre ait écrit la
@@ -412,7 +415,8 @@ def test_015_org_pages_filter_date(dash_duo: DashComposite):
         filter_cell_result = f"#{container_id} .ag-center-cols-container .ag-row"
         _filter_input: WebElement = _filter_input_in_view(dash_duo, filter_input)
         _filter_input.send_keys("zzz_no_match")  # un "objet" qui n'existe pas
-        # Le filtrage est asynchrone (debounce du filtre texte AG Grid) : attendre
+        _filter_input.send_keys(Keys.ENTER)  # validation : pas d'application à la volée
+        # Le filtrage est asynchrone (requête serveur) : attendre
         # la mise à jour de la grille plutôt que de lire les lignes immédiatement
         # (sinon on lit l'état pré-filtre).
         dash_duo.wait_for_no_elements(filter_cell_result, timeout=4)
