@@ -6,7 +6,7 @@ from flask_login import current_user
 from src.admin.db import log_action
 from src.admin.guard import is_admin
 from src.admin.tables import all_tables, get_rows, set_cell
-from src.figures import client_grid
+from src.figures import AG_GRID_FILTER_PARAMS, client_grid
 from src.pages.admin._shell import not_admin
 
 register_page(
@@ -70,6 +70,7 @@ def layout(**_):
                     "sortable": True,
                     "filter": True,
                     "floatingFilter": True,
+                    "filterParams": AG_GRID_FILTER_PARAMS,
                     "resizable": True,
                     "minWidth": 120,
                 },

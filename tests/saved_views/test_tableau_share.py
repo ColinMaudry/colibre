@@ -2,6 +2,7 @@ import json
 from unittest.mock import patch
 
 import dash
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
 import src.app  # noqa: F401  # instancie l'app → register_page()
@@ -151,7 +152,7 @@ def _type_in_first_filter(dash_duo):
         "arguments[0].scrollIntoView({block: 'center', inline: 'center'});", el
     )
     el.click()
-    el.send_keys("z")
+    el.send_keys("z", Keys.ENTER)
 
 
 def test_open_shared_view_applies_and_shows_box(dash_duo, users_db_path):

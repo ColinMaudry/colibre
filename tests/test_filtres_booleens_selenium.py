@@ -8,6 +8,7 @@ comptent.
 
 from dash.testing.composite import DashComposite
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 from tests._selenium_compte import ouvrir_le_tableau, se_connecter
 
@@ -22,7 +23,7 @@ def _saisir_objet(dash_duo: DashComposite, texte: str):
     dash_duo.driver.execute_script(
         "arguments[0].scrollIntoView({block: 'center', inline: 'center'});", champ
     )
-    champ.send_keys(texte)
+    champ.send_keys(texte, Keys.ENTER)
 
 
 def test_abonne_voit_la_correction(dash_duo: DashComposite, compte_abonne):

@@ -4,6 +4,7 @@ Serveur en debug=True (dev-renderer) : valide aussi la cohérence des motifs
 ALL/MATCH des callbacks des pastilles, comme test_entity_grid_datasource.
 """
 
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
 import src.app  # noqa: F401  # instancie l'app → register_page()
@@ -91,7 +92,7 @@ def test_fiche_acheteur_pastille_et_suppression(dash_duo):
     _demarrer(dash_duo, "/acheteurs/123")
     champ = '#acheteur-grid-container .ag-floating-filter[col-id="objet"] input'
     dash_duo.wait_for_element(champ, timeout=15)
-    dash_duo.find_element(champ).send_keys("test")
+    dash_duo.find_element(champ).send_keys("test", Keys.ENTER)
 
     dash_duo.wait_for_contains_text(
         "#acheteur-filter-pills", "contient test", timeout=10
@@ -114,7 +115,7 @@ def test_fiche_acheteur_clic_pastille_focus_du_filtre(dash_duo):
     _demarrer(dash_duo, "/acheteurs/123")
     champ = '#acheteur-grid-container .ag-floating-filter[col-id="objet"] input'
     dash_duo.wait_for_element(champ, timeout=15)
-    dash_duo.find_element(champ).send_keys("test")
+    dash_duo.find_element(champ).send_keys("test", Keys.ENTER)
     dash_duo.wait_for_element("#acheteur-filter-pills .filter-pill-body", timeout=10)
     dash_duo.driver.execute_script("document.activeElement.blur()")
 
