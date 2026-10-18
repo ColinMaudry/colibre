@@ -59,6 +59,7 @@ def _saisir_filtre_objet(dash_duo: DashComposite, conteneur: str, texte: str) ->
         "arguments[0].scrollIntoView({block: 'center', inline: 'center'});", el
     )
     el.send_keys(texte)
+    el.send_keys(Keys.ENTER)  # le filtre n'est appliqué qu'à la validation
 
 
 def _filtres_envoyes(dash_duo: DashComposite) -> list[list]:
