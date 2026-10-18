@@ -1,6 +1,7 @@
-#### 3.4.0
+##### 3.3.1 (18 octobre 2026)
 
 - Dans les tableaux, les filtres de colonnes ne s'appliquent plus à chaque caractère tapé : il faut valider avec Entrée (ou le bouton « Appliquer » du menu du filtre)
+- Les filtres booléens d'une vue restent activés pour une personne sans abonnement
 
 #### 3.3.0 (12 octobre 2026)
 
