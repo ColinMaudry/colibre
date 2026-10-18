@@ -645,14 +645,26 @@ def layout(**_):
     return _layout(current_user_has_subscription())
 
 
+def _operateurs(filter_model, vue_resolution) -> bool:
+    """Opérateurs booléens actifs : abonné·e, ou filtre identique à celui de
+    la vue ouverte par ?vue= (#97). L'abonnement est testé d'abord, pour
+    éviter la lecture de la vue en base."""
+    return current_user_has_subscription() or (
+        saved_views_resolve.vue_autorise_operateurs(
+            vue_resolution, filter_model, schema
+        )
+    )
+
+
 @callback(
     Output("tableau_grid", "getRowsResponse"),
     Output("tableau-total", "data"),
     Output("tableau-total-unique", "data"),
     Input("tableau_grid", "getRowsRequest"),
+    State("vue-resolution", "data"),
     prevent_initial_call=True,
 )
-def get_rows_tableau(request):
+def get_rows_tableau(request, vue_resolution=None):
     if request is None:
         return no_update, no_update, no_update
     filter_model = request.get("filterModel") or None
@@ -662,7 +674,7 @@ def get_rows_tableau(request):
         sort_model,
         request.get("startRow", 0),
         request.get("endRow", 100),
-        operateurs=current_user_has_subscription(),
+        operateurs=_operateurs(filter_model, vue_resolution),
     )
     return {"rowData": rows, "rowCount": total}, total, total_unique
 
@@ -704,7 +716,12 @@ def update_meta(total, total_unique, filter_model):
     return nb_rows, download_disabled, download_text, download_title, None
 
 
-register_filter_pills_callbacks("tableau", "tableau_grid", clear_active_view=True)
+register_filter_pills_callbacks(
+    "tableau",
+    "tableau_grid",
+    clear_active_view=True,
+    vue_resolution_id="vue-resolution",
+)
 
 
 @callback(
@@ -713,9 +730,12 @@ register_filter_pills_callbacks("tableau", "tableau_grid", clear_active_view=Tru
     State("tableau_grid", "filterModel"),
     State("tableau_grid", "columnState"),
     State("tableau-total", "data"),
+    State("vue-resolution", "data"),
     prevent_initial_call=True,
 )
-def download_data(n_clicks, filter_model, column_state, total=None):
+def download_data(
+    n_clicks, filter_model, column_state, total=None, vue_resolution=None
+):
     if not filter_model:
         # Sans filtre, le bouton pointe déjà (via href) vers le CSV complet
         # de data.gouv.fr — un clic ne doit pas en plus déclencher la
@@ -735,7 +755,7 @@ def download_data(n_clicks, filter_model, column_state, total=None):
         filter_model,
         sort_model,
         hidden_columns,
-        operateurs=current_user_has_subscription(),
+        operateurs=_operateurs(filter_model, vue_resolution),
     )
 
     if df.height > EXCEL_MAX_ROWS:

@@ -9,7 +9,12 @@ import json
 
 from src.saved_views import db, ui
 from src.utils import logger
-from src.utils.query_ast import ast_from_dict, ast_to_filtermodel
+from src.utils.query_ast import (
+    ast_from_dict,
+    ast_to_dict,
+    ast_to_filtermodel,
+    filtermodel_to_ast,
+)
 
 NOT_FOUND_MESSAGE = "Cette vue est introuvable ou a été supprimée."
 
@@ -57,3 +62,39 @@ def resolve_vue_param(vue_param: str | None, schema) -> dict:
         "url": ui.build_view_url(row["name"], row["token"]),
         "error": None,
     }
+
+
+def _forme_canonique(filter_model: dict | None, schema) -> dict:
+    """Filtre colonne par colonne sous forme d'AST sérialisé : insensible à
+    l'ordre des colonnes et aux écarts d'écriture du filterModel. Les entrées
+    sans effet en SQL (colonne hors schéma, type inconnu) sont omises."""
+    forme = {}
+    for col, entree in (filter_model or {}).items():
+        ast = filtermodel_to_ast({col: entree}, schema)
+        if ast is not None:
+            forme[col] = ast_to_dict(ast)
+    return forme
+
+
+def vue_autorise_operateurs(
+    vue_resolution: dict | None, filter_model: dict | None, schema
+) -> bool:
+    """Vrai si `filter_model` est exactement le filtre de la vue ouverte par
+    ?vue= (#97) : ses opérateurs booléens s'appliquent alors sans abonnement.
+
+    Seul le jeton de `vue_resolution` est lu ; la vue est relue en base, son
+    `filter_model` (venu du navigateur) n'est jamais utilisé."""
+    if not filter_model or not vue_resolution or not vue_resolution.get("found"):
+        return False
+    token = vue_resolution.get("token")
+    if not token:
+        return False
+    row = db.get_by_token(token)
+    if row is None:
+        return False
+    try:
+        ast = ast_from_dict(json.loads(row["query"]).get("ast"))
+        vue = ast_to_filtermodel(ast, schema)
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        return False
+    return _forme_canonique(vue, schema) == _forme_canonique(filter_model, schema)

@@ -201,23 +201,35 @@ def _premier(valeur):
 
 
 def register_filter_pills_callbacks(
-    context: str, grid_id: "str | dict", clear_active_view: bool = False
+    context: str,
+    grid_id: "str | dict",
+    clear_active_view: bool = False,
+    vue_resolution_id: "str | None" = None,
 ) -> None:
     """Callbacks des pastilles pour une page (`tableau`, `acheteur`, `titulaire`).
 
     `grid_id` : id fixe de la grille, ou motif ALL pour les grilles des fiches.
+    `vue_resolution_id` : store de la vue ouverte par ?vue= (Tableau) ; un
+    filtre identique à celui de la vue garde ses opérateurs booléens sans
+    abonnement (#97).
     """
+    etats = [State(vue_resolution_id, "data")] if vue_resolution_id else []
 
     @callback(
         Output(f"{context}-filter-pills", "children"),
         Input(grid_id, "filterModel"),
+        *etats,
     )
-    def _render(filter_model):
+    def _render(filter_model, vue_resolution=None):
+        from src.db import schema
         from src.pages._compte_shell import current_user_has_subscription
+        from src.saved_views.resolve import vue_autorise_operateurs
 
-        return filter_pills(
-            _premier(filter_model), context, current_user_has_subscription()
+        filter_model = _premier(filter_model)
+        operateurs = current_user_has_subscription() or vue_autorise_operateurs(
+            vue_resolution, filter_model, schema
         )
+        return filter_pills(filter_model, context, operateurs)
 
     sorties = [Output(grid_id, "filterModel", allow_duplicate=True)]
     if clear_active_view:
