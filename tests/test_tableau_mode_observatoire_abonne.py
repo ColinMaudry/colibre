@@ -11,6 +11,7 @@ import time
 
 from dash.testing.composite import DashComposite
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 from tests._selenium_compte import ouvrir_le_tableau, se_connecter
 
@@ -42,7 +43,7 @@ def test_la_bascule_affiche_les_cards_du_filtre_courant(
     champ = driver.find_element(
         By.CSS_SELECTOR, ".ag-floating-filter-input input[aria-label*='acheteur']"
     )
-    champ.send_keys("ACHETEUR")
+    champ.send_keys("ACHETEUR", Keys.ENTER)
     time.sleep(2)
 
     driver.find_element(By.ID, "tableau-mode-observatoire").click()

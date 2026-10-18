@@ -1177,6 +1177,7 @@ def make_schema_grid():
             "resizable": True,
             "sortable": False,
             "floatingFilter": True,
+            "filterParams": AG_GRID_FILTER_PARAMS,
         },
     )
 
@@ -1196,6 +1197,12 @@ AG_GRID_THEME = {
         "})"
     )
 }
+
+
+# Filtres de colonne : la saisie n'est appliquée qu'à la validation (Entrée
+# dans le filtre flottant, bouton « Appliquer » du menu), pas à chaque
+# caractère tapé. `buttons: ["apply"]` neutralise aussi le debounceMs d'AG Grid.
+AG_GRID_FILTER_PARAMS = {"buttons": ["apply"]}
 
 
 # Libellés du menu de filtre AG Grid, traduits en français (option native
@@ -1289,7 +1296,12 @@ def ag_grid(
     return dag.AgGrid(
         id=grid_id,
         columnDefs=column_defs,
-        defaultColDef={"resizable": True, "minWidth": 120, "floatingFilter": True},
+        defaultColDef={
+            "resizable": True,
+            "minWidth": 120,
+            "floatingFilter": True,
+            "filterParams": AG_GRID_FILTER_PARAMS,
+        },
         eventListeners=event_listeners,
         rowModelType="infinite",
         dangerously_allow_code=True,  # rend le HTML <a> des cellules liens

@@ -1,11 +1,17 @@
+import base64
+import io
 import json
 from unittest.mock import patch
 
 import dash
+import openpyxl
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
 import src.app  # noqa: F401  # instancie l'app → register_page()
 from src.auth import db as auth_db
+from src.db import schema
 from src.pages import tableau
 from src.saved_views import db as saved_views_db
 from src.saved_views import resolve
@@ -151,7 +157,7 @@ def _type_in_first_filter(dash_duo):
         "arguments[0].scrollIntoView({block: 'center', inline: 'center'});", el
     )
     el.click()
-    el.send_keys("z")
+    el.send_keys("z", Keys.ENTER)
 
 
 def test_open_shared_view_applies_and_shows_box(dash_duo, users_db_path):
@@ -191,3 +197,94 @@ def test_open_shared_view_applies_and_shows_box(dash_duo, users_db_path):
         return display == "none"
 
     WebDriverWait(dash_duo.driver, 15).until(_box_hidden)
+
+
+# --- Opérateurs booléens d'une vue ouverte, pour un non-abonné (#97) -------
+# tests/test.parquet n'a qu'une ligne (objet « Objet test ») : `test OU zzz`
+# la trouve avec les opérateurs, pas sans (les trois mots sont alors exigés).
+
+
+def _vue_booleenne(monkeypatch, ast=None):
+    monkeypatch.setattr(tableau, "current_user_has_subscription", lambda: False)
+    saved_views_db.init_schema()
+    ast = ast or And([Condition("objet", "contains", "test OU zzz")])
+    query = json.dumps({"ast": ast_to_dict(ast), "columnState": []})
+    token = saved_views_db.upsert(_make_user(), "tableau", "Ma vue", query)
+    return resolve.resolve_vue_param(token, schema)
+
+
+def test_get_rows_vue_non_abonne(monkeypatch, users_db_path):
+    res = _vue_booleenne(monkeypatch)
+    req = {"filterModel": res["filter_model"], "startRow": 0, "endRow": 100}
+
+    rows, total, _ = tableau.get_rows_tableau(req, res)
+    assert rows["rowCount"] == 1 and total == 1
+
+    modifie = {"objet": {**res["filter_model"]["objet"], "filter": "test OU zzzz"}}
+    _, total, _ = tableau.get_rows_tableau({**req, "filterModel": modifie}, res)
+    assert total == 0
+
+    _, total, _ = tableau.get_rows_tableau(req, None)
+    assert total == 0
+
+
+def test_export_vue_non_abonne(monkeypatch, users_db_path):
+    res = _vue_booleenne(monkeypatch)
+
+    out = tableau.download_data(1, res["filter_model"], [], 1, res)
+
+    assert out["filename"].endswith(".xlsx")
+    contenu = base64.b64decode(out["content"])
+    # En-tête + la ligne ; sans l'exception, l'export serait vide.
+    assert openpyxl.load_workbook(io.BytesIO(contenu)).active.max_row == 2
+
+
+def test_vue_partagee_operateurs_non_abonne(dash_duo, users_db_path):
+    """Visiteur non connecté : la vue partagée applique ses filtres booléens
+    sans bandeau ; une frappe dans le filtre Objet rend le régime non-abonné.
+    La vue mêle filtres texte, nombre et date pour vérifier que le filterModel
+    renvoyé par la vraie grille reste reconnu identique à celui de la vue."""
+    saved_views_db.init_schema()
+    ast = And(
+        [
+            Condition("objet", "contains", "test OU zzz"),
+            Condition("montant", "gt", 5),
+            Condition("dateNotification", "gt", "2024-01-01 00:00:00"),
+        ]
+    )
+    query = json.dumps({"ast": ast_to_dict(ast), "columnState": []})
+    token = saved_views_db.upsert(_make_user(), "tableau", "Ma vue", query)
+
+    from src.app import app
+
+    dash_duo.start_server(app)
+    dash_duo.wait_for_text_to_equal(".logo > h1", "colibre", timeout=6)
+    dash_duo.wait_for_page(dash_duo.server_url + f"/tableau?vue={token}_ma-vue")
+
+    dash_duo.wait_for_contains_text("#nb_rows", "1 marchés (1 lignes)", timeout=15)
+    dash_duo.wait_for_contains_text("#tableau-filter-pills", "test OU zzz", timeout=10)
+    assert not dash_duo.driver.find_elements(
+        By.CSS_SELECTOR, "#tableau-filter-pills .filter-pills-banniere"
+    )
+
+    # Colonnes virtualisées par AG Grid : Objet n'est dans le DOM qu'une fois
+    # amenée à l'écran (même procédé que src/assets/filter_pills.js).
+    dash_duo.driver.execute_script(
+        'dash_ag_grid.getApi("tableau_grid").ensureColumnVisible("objet");'
+    )
+    champ = '#tableau_grid .ag-floating-filter[col-id="objet"] input'
+    dash_duo.wait_for_element(champ, timeout=10)
+
+    def _bandeau_visible(_d):
+        # Nouvelle tentative tant que le bandeau n'est pas là : le re-rendu qui
+        # suit l'application de la vue peut invalider le champ. Entrée valide
+        # la saisie quand le filtre ne s'applique qu'à la validation.
+        dash_duo.find_element(champ).send_keys("z", Keys.ENTER)
+        return bool(
+            dash_duo.driver.find_elements(
+                By.CSS_SELECTOR, "#tableau-filter-pills .filter-pills-banniere"
+            )
+        )
+
+    WebDriverWait(dash_duo.driver, 15, poll_frequency=2).until(_bandeau_visible)
+    dash_duo.wait_for_contains_text("#nb_rows", "0 marchés", timeout=10)
