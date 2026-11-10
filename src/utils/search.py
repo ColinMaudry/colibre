@@ -15,18 +15,31 @@ def search_org(dff: pl.DataFrame, query: str, org_type: str) -> pl.DataFrame:
     :param dff: Polars DataFrame built by `build_org_frame`
     :param query: User search string
     :param org_type: 'acheteur' or 'titulaire'
-    :return: Filtered DataFrame with 'matches' column
+    :return: Matching organisations (id, nom, Département, Marchés), empty
+        when the query holds nothing to search for
     """
-    if not query.strip():
-        return dff.select(pl.lit(False).alias("matches"))
-
     # Normalize query the same way `build_org_frame` normalized the frame:
     # lowercase, no accents, hyphens as spaces.
     normalized_query = normalize_text(query.strip()).lower().replace("-", " ")
     tokens = [" " + token for token in normalized_query.split() if token]
 
-    # Define columns based on entity type
-    cols = [
+    # Blank query, or hyphens and spaces only: no token, so no result (and
+    # `pl.sum_horizontal` would fail on an empty list). Same columns as a
+    # normal result, so callers can read `{org_type}_id` either way.
+    if not tokens:
+        return pl.DataFrame(
+            schema={
+                f"{org_type}_id": pl.String,
+                f"{org_type}_nom": pl.String,
+                "Département": pl.String,
+                "Marchés": dff.schema["Marchés"],
+            }
+        )
+
+    # Columns kept for display only: what is searchable is set by
+    # `champs_recherches`, concatenated into COLONNE_RECHERCHE by
+    # `build_org_frame`.
+    colonnes_affichees = [
         f"{org_type}_id",
         f"{org_type}_nom",
         f"{org_type}_departement_nom",
@@ -48,10 +61,11 @@ def search_org(dff: pl.DataFrame, query: str, org_type: str) -> pl.DataFrame:
 
     # Column selection
     if org_type == "acheteur":
-        dff = dff.select(cols + ["Marchés", COLONNE_RECHERCHE])
+        dff = dff.select(colonnes_affichees + ["Marchés", COLONNE_RECHERCHE])
     if org_type == "titulaire":
         dff = dff.select(
-            cols + ["Marchés", "titulaire_typeIdentifiant", COLONNE_RECHERCHE]
+            colonnes_affichees
+            + ["Marchés", "titulaire_typeIdentifiant", COLONNE_RECHERCHE]
         )
 
     # Apply and filter

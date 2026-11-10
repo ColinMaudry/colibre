@@ -10,31 +10,34 @@ import pytest
 
 import src.utils.data as data
 from src.utils.search import search_org
+from src.utils.text_normalization import champs_recherches
 
 
 @pytest.fixture
 def con_decp():
     """Table `decp` synthétique : deux organismes de Nîmes, une autre
-    métropole, un nom avec trait d'union."""
+    métropole, un nom avec trait d'union.
+
+    La table porte toutes les colonnes `acheteur_*` du schéma réel, car
+    `build_org_frame` groupe sur `schema.names()` ; seules celles que cherche
+    `search_org` sont renseignées."""
     import duckdb
 
+    colonnes = [c for c in data.schema.names() if c.startswith("acheteur_")]
+    renseignees = champs_recherches("acheteur")
     con = duckdb.connect(":memory:")
     con.execute(
-        "CREATE TABLE decp ("
-        "acheteur_id VARCHAR, acheteur_nom VARCHAR, acheteur_categorie VARCHAR, "
-        "acheteur_departement_nom VARCHAR, acheteur_departement_code VARCHAR, "
-        "acheteur_commune_nom VARCHAR)"
+        "CREATE TABLE decp (" + ", ".join(f'"{c}" VARCHAR' for c in colonnes) + ")"
     )
     con.executemany(
-        "INSERT INTO decp VALUES (?, ?, ?, ?, ?, ?)",
+        f"INSERT INTO decp ({', '.join(renseignees)}) VALUES (?, ?, ?, ?, ?)",
         [
-            ("210540000001", "Mairie de Nîmes", "Collectivité", "Gard", "30", "Nîmes"),
-            ("210540000002", "Nîmes Métropole", "EPCI", "Gard", "30", "Nîmes"),
-            ("330000000001", "Bordeaux Métropole", "EPCI", "Gironde", "33", "Bordeaux"),
+            ("210540000001", "Mairie de Nîmes", "Gard", "30", "Nîmes"),
+            ("210540000002", "Nîmes Métropole", "Gard", "30", "Nîmes"),
+            ("330000000001", "Bordeaux Métropole", "Gironde", "33", "Bordeaux"),
             (
                 "421000000001",
                 "Commune de Saint-Étienne",
-                "Collectivité",
                 "Loire",
                 "42",
                 "Saint-Étienne",
@@ -91,17 +94,19 @@ def test_aucun_resultat(frame_acheteurs):
     assert search_org(frame_acheteurs, "absent", "acheteur").height == 0
 
 
+@pytest.mark.parametrize("saisie", ["-", "--", " - ", "", "   "])
+def test_saisie_sans_jeton_ne_retourne_rien(frame_acheteurs, saisie):
+    """Sans jeton à chercher (vide, ou seulement traits d'union et espaces),
+    aucun résultat, avec les colonnes d'un résultat normal."""
+    resultats = search_org(frame_acheteurs, saisie, "acheteur")
+
+    assert resultats.height == 0
+    assert resultats.columns == search_org(frame_acheteurs, "nimes", "acheteur").columns
+
+
 def test_colonne_de_recherche_absente_du_resultat(frame_acheteurs):
     from src.utils.text_normalization import COLONNE_RECHERCHE
 
     resultats = search_org(frame_acheteurs, "nimes", "acheteur")
 
     assert COLONNE_RECHERCHE not in resultats.columns
-
-
-def test_frames_reelles_portent_la_colonne_de_recherche():
-    from src.utils.data import DF_ACHETEURS, DF_TITULAIRES
-    from src.utils.text_normalization import COLONNE_RECHERCHE
-
-    assert COLONNE_RECHERCHE in DF_ACHETEURS.columns
-    assert COLONNE_RECHERCHE in DF_TITULAIRES.columns

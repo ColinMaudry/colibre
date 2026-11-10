@@ -24,6 +24,19 @@ NORMALIZED_COLUMNS: dict[str, str] = {
 # (src/utils/search.py).
 COLONNE_RECHERCHE = "recherche_normalisee"
 
+
+def champs_recherches(org_type: str) -> list[str]:
+    """Champs concaténés dans `COLONNE_RECHERCHE` pour `org_type` ('acheteur'
+    ou 'titulaire') : ce que la recherche d'organismes permet de trouver."""
+    return [
+        f"{org_type}_id",
+        f"{org_type}_nom",
+        f"{org_type}_departement_nom",
+        f"{org_type}_departement_code",
+        f"{org_type}_commune_nom",
+    ]
+
+
 # La casse n'est pas modifiée : c'est l'ILIKE qui l'ignore.
 _REPLACEMENTS = {
     "œ": "oe",
