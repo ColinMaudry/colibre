@@ -59,4 +59,14 @@ def test_normalized_target_et_term():
     assert normalized_target("objet", '"objet"') == '"objet_normalise"'
     assert normalized_target("montant", '"montant"') == '"montant"'
     assert normalized_term("objet", "d’œuvre") == "d'oeuvre"
-    assert normalized_term("acheteur_nom", "Nîmes") == "Nîmes"
+    # #150 : les noms d'organismes sont normalisés comme objet.
+    assert (
+        normalized_target("acheteur_nom", '"acheteur_nom"')
+        == '"acheteur_nom_normalise"'
+    )
+    assert (
+        normalized_target("titulaire_nom", '"titulaire_nom"')
+        == '"titulaire_nom_normalise"'
+    )
+    assert normalized_term("acheteur_nom", "Nîmes") == "Nimes"
+    assert normalized_term("titulaire_nom", "Fréjus") == "Frejus"

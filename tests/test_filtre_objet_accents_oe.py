@@ -140,20 +140,71 @@ def test_observatoire_filtre_objet_ignore_accents_et_ligatures(
 
 
 @pytest.mark.parametrize(
-    "colonne, saisie", [("acheteur_nom", "Nîmes"), ("titulaire_nom", "fréjus")]
+    "colonne, saisie",
+    [
+        ("acheteur_nom", "Nîmes"),
+        ("acheteur_nom", "nimes"),
+        ("acheteur_nom", "NIMES"),
+        ("acheteur_nom", "nîmes métropole"),
+        ("titulaire_nom", "Fréjus"),
+        ("titulaire_nom", "fréjus"),
+        ("titulaire_nom", "FREJUS"),
+    ],
 )
-def test_noms_stockes_sans_accents_saisie_desaccentuee(con_objets, colonne, saisie):
-    """acheteur_nom/titulaire_nom sont stockés sans accents (#138) : seule la
-    saisie est normalisée, et une saisie accentuée retrouve la valeur."""
+def test_filtre_nom_insensible_a_la_casse_et_aux_accents(con_objets, colonne, saisie):
+    """#150 : les noms sont stockés en casse normale avec accents ; « nimes »,
+    « Nîmes » et « NIMES » retournent les mêmes lignes."""
     where, params = en_sql(analyser(saisie, True), colonne)
 
     nb = con_objets.execute(
         f"SELECT count(*) FROM decp WHERE {where}", params
     ).fetchone()[0]
-    assert nb == con_objets.execute("SELECT count(*) FROM decp").fetchone()[0]
+    assert (
+        nb
+        == con_objets.execute(
+            "SELECT count(*) FROM decp WHERE acheteur_nom IS NOT NULL"
+        ).fetchone()[0]
+    )
 
     where, params = en_sql(analyser("absent", True), colonne)
     nb = con_objets.execute(
         f"SELECT count(*) FROM decp WHERE {where}", params
     ).fetchone()[0]
     assert nb == 0
+
+
+def test_starts_with_et_ends_with_sur_les_noms(con_objets):
+    where, params = ast_to_sql(
+        Condition("acheteur_nom", "startsWith", "Nîmes"), SCHEMA, operateurs=True
+    )
+    nb = con_objets.execute(
+        f"SELECT count(*) FROM decp WHERE {where}", params
+    ).fetchone()[0]
+    assert nb == 9
+
+    where, params = ast_to_sql(
+        Condition("acheteur_nom", "endsWith", "MÉTROPOLE"), SCHEMA, operateurs=True
+    )
+    nb = con_objets.execute(
+        f"SELECT count(*) FROM decp WHERE {where}", params
+    ).fetchone()[0]
+    assert nb == 9
+
+
+def test_equals_sur_les_noms_reste_exact(con_objets):
+    where, params = ast_to_sql(
+        Condition("acheteur_nom", "eq", "Nimes Metropole"), SCHEMA, operateurs=True
+    )
+
+    nb = con_objets.execute(
+        f"SELECT count(*) FROM decp WHERE {where}", params
+    ).fetchone()[0]
+    assert nb == 0
+
+    where, params = ast_to_sql(
+        Condition("acheteur_nom", "eq", "Nîmes Métropole"), SCHEMA, operateurs=True
+    )
+    nb = con_objets.execute(
+        f"SELECT count(*) FROM decp WHERE {where}", params
+    ).fetchone()[0]
+    assert nb == 9

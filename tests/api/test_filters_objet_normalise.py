@@ -51,11 +51,24 @@ def test_objet_exact_reste_exact(con_objets):
     ]
 
 
-def test_autre_colonne_non_normalisee(con_objets):
-    # acheteur_nom n'est pas normalisé côté API : la saisie accentuée ne
-    # retrouve pas « NIMES METROPOLE ».
-    assert _objets(con_objets, [("acheteur_nom__contains", "Nîmes")]) == []
-    assert len(_objets(con_objets, [("acheteur_nom__contains", "NIMES")])) == 9
+@pytest.mark.parametrize("saisie", ["Nîmes", "nimes", "NIMES", "nîmes métropole"])
+def test_nom_contains_insensible_a_la_casse_et_aux_accents(con_objets, saisie):
+    """#150 : les noms sont filtrés comme « objet » — la saisie accentuée ou
+    non retrouve « Nîmes Métropole » (casse normale avec accents)."""
+    assert len(_objets(con_objets, [("acheteur_nom__contains", saisie)])) == 9
+
+
+def test_nom_notcontains_exclut(con_objets):
+    assert _objets(con_objets, [("acheteur_nom__notcontains", "nimes")]) == []
+
+
+def test_nom_startswith_insensible_a_la_casse_et_aux_accents(con_objets):
+    assert len(_objets(con_objets, [("acheteur_nom__startswith", "nîmes")])) == 9
+
+
+def test_nom_exact_reste_exact(con_objets):
+    assert _objets(con_objets, [("acheteur_nom__exact", "Nimes Metropole")]) == []
+    assert len(_objets(con_objets, [("acheteur_nom__exact", "Nîmes Métropole")])) == 9
 
 
 def test_mcp_objet_contient_equivaut_a_objet_contains(con_objets, objets_maitrise):

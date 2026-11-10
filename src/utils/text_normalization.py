@@ -12,8 +12,17 @@ Ce module n'importe rien du projet : il est utilisé par `src.db` comme par
 
 import unicodedata
 
-# Colonne filtrable -> colonne précalculée dans `decp`.
-NORMALIZED_COLUMNS: dict[str, str] = {"objet": "objet_normalise"}
+# Colonnes filtrables -> colonnes précalculées dans `decp`.
+NORMALIZED_COLUMNS: dict[str, str] = {
+    "objet": "objet_normalise",
+    "acheteur_nom": "acheteur_nom_normalise",
+    "titulaire_nom": "titulaire_nom_normalise",
+}
+
+# Colonne technique de recherche des frames d'organismes (#150) : calculée
+# par `build_org_frame` (src/utils/data.py), consommée par `search_org`
+# (src/utils/search.py).
+COLONNE_RECHERCHE = "recherche_normalisee"
 
 # La casse n'est pas modifiée : c'est l'ILIKE qui l'ignore.
 _REPLACEMENTS = {

@@ -58,6 +58,14 @@ def decp_synthetique(monkeypatch):
         "CREATE TABLE decp AS SELECT * FROM (VALUES " + ",".join(lignes) + ") AS t("
         "uid, titulaire_id, titulaire_nom, titulaire_typeIdentifiant, titulaire_distance)"
     )
+    # Colonne précalculée par le build réel (#150), requise par les filtres
+    # sur titulaire_nom.
+    from src.utils.text_normalization import normalize_text_sql
+
+    conn.execute("ALTER TABLE decp ADD COLUMN titulaire_nom_normalise VARCHAR")
+    conn.execute(
+        f"UPDATE decp SET titulaire_nom_normalise = {normalize_text_sql('titulaire_nom')}"
+    )
     monkeypatch.setattr(db_module, "get_cursor", lambda: conn)
     yield conn
     conn.close()

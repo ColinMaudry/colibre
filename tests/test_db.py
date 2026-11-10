@@ -117,14 +117,14 @@ def built_db(tmp_path, monkeypatch):
                 "id": "1",
                 "objet": "Travaux",
                 "acheteur_id": "123",
-                "acheteur_nom": "ACHETEUR 1",
+                "acheteur_nom": "Acheteur Étoile",
                 "acheteur_departement_code": "75",
                 "acheteur_departement_nom": "Paris",
                 "acheteur_commune_nom": "Paris",
                 "titulaire_commune_nom": "Paris",
                 "titulaire_departement_nom": "Paris",
                 "titulaire_id": "345",
-                "titulaire_nom": "TITULAIRE 1",
+                "titulaire_nom": "Titulaire Fréjus",
                 "titulaire_departement_code": "35",
                 "titulaire_typeIdentifiant": "SIRET",
                 "montant": 1000.0,
@@ -137,7 +137,7 @@ def built_db(tmp_path, monkeypatch):
                 "id": "2",
                 "objet": "Études",
                 "acheteur_id": "123",
-                "acheteur_nom": "ACHETEUR 1",
+                "acheteur_nom": "Acheteur Étoile",
                 "acheteur_departement_code": "75",
                 "acheteur_departement_nom": "Paris",
                 "acheteur_commune_nom": "Paris",
@@ -415,16 +415,45 @@ def test_build_ajoute_la_colonne_objet_normalise(built_db):
     assert all(normalise == normalize_text(objet) for objet, normalise in rows)
 
 
+def test_build_ajoute_les_colonnes_nom_normalisees(built_db):
+    """#150 : `acheteur_nom_normalise` et `titulaire_nom_normalise` sont
+    calculées comme `objet_normalise` sur des noms en casse normale avec
+    accents."""
+    import duckdb
+
+    from src.utils.text_normalization import normalize_text
+
+    with duckdb.connect(str(built_db), read_only=True) as c:
+        rows = c.execute(
+            "SELECT acheteur_nom, acheteur_nom_normalise, "
+            "titulaire_nom, titulaire_nom_normalise FROM decp"
+        ).fetchall()
+
+    assert (
+        "Acheteur Étoile",
+        "Acheteur Etoile",
+        "Titulaire Fréjus",
+        "Titulaire Frejus",
+    ) in rows
+    assert all(normalise == normalize_text(nom) for nom, normalise, _, _ in rows)
+    assert all(normalise == normalize_text(nom) for _, _, nom, normalise in rows)
+
+
 def test_colonnes_normalisees_masquees_du_schema():
     from src.db import query_marches, schema
     from src.utils.table import COLUMNS
 
-    assert "objet_normalise" not in schema.names()
-    assert "objet_normalise" not in COLUMNS
-    assert "objet_normalise" not in query_marches(limit=1).columns
-    # La colonne reste lisible quand on la demande explicitement.
-    assert query_marches(columns=["objet_normalise"], limit=1).columns == [
-        "objet_normalise"
+    for colonne in (
+        "objet_normalise",
+        "acheteur_nom_normalise",
+        "titulaire_nom_normalise",
+    ):
+        assert colonne not in schema.names()
+        assert colonne not in COLUMNS
+        assert colonne not in query_marches(limit=1).columns
+    # Les colonnes restent lisibles quand on les demande explicitement.
+    assert query_marches(columns=["acheteur_nom_normalise"], limit=1).columns == [
+        "acheteur_nom_normalise"
     ]
 
 

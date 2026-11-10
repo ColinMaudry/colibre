@@ -9,33 +9,19 @@ import re
 from dataclasses import dataclass, field
 from types import NoneType
 
-from unidecode import unidecode
-
-from src.utils.text_normalization import (
-    NORMALIZED_COLUMNS,
-    normalized_target,
-    normalized_term,
-)
-
-# Colonnes dont les valeurs sont déjà stockées sans accents (cf. #138) : seule
-# la saisie utilisateur est désaccentuée pour matcher, comme sur /recherche.
-_ACCENT_INSENSITIVE_COLUMNS = {"acheteur_nom", "titulaire_nom"}
+from src.utils.text_normalization import normalized_target, normalized_term
 
 
 def text_filter_target(column: str, quoted_col: str) -> str:
     """Colonne à comparer à la saisie renvoyée par `normalize_text_term` : la
-    colonne précalculée pour les colonnes de `NORMALIZED_COLUMNS` (#147), sinon
-    la colonne elle-même."""
+    colonne précalculée pour les colonnes de `NORMALIZED_COLUMNS` (#147,
+    #150), sinon la colonne elle-même."""
     return normalized_target(column, quoted_col)
 
 
 def normalize_text_term(column: str, term: str) -> str:
     """Saisie normalisée selon la colonne filtrée (cf. `text_filter_target`)."""
-    if column in NORMALIZED_COLUMNS:
-        return normalized_term(column, term)
-    if column in _ACCENT_INSENSITIVE_COLUMNS:
-        return unidecode(term)
-    return term
+    return normalized_term(column, term)
 
 
 _PROFONDEUR_MAX = 10

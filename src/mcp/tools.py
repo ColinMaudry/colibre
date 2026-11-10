@@ -13,6 +13,9 @@ def rechercher_organisations(
 ) -> list[dict]:
     """Recherche des acheteurs ou titulaires publics par nom.
 
+    Insensible à la casse et aux accents : « nimes », « Nîmes » et
+    « NIMES » retournent les mêmes organismes.
+
     Utiliser en premier pour résoudre un nom d'organisation vers son
     identifiant, à passer ensuite à stats_acheteur / stats_titulaire.
 

@@ -170,7 +170,8 @@ def _load_source_frame() -> pl.DataFrame:
 #   1 : schéma d'origine
 #   2 : #128 ajoute nb_marches à acheteurs_departement et titulaires_departement
 #   3 : #147 ajoute objet_normalise à decp
-SCHEMA_VERSION = 3
+#   4 : #150 ajoute acheteur_nom_normalise et titulaire_nom_normalise à decp
+SCHEMA_VERSION = 4
 
 # Colonnes techniques précalculées à la construction (#147). Elles servent aux
 # filtres, jamais à l'affichage : `schema` ne les contient pas, donc ni les

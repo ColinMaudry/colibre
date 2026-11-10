@@ -1,14 +1,18 @@
 import polars as pl
-from unidecode import unidecode
 
 from src.utils.table import add_links
+from src.utils.text_normalization import COLONNE_RECHERCHE, normalize_text
 
 
 def search_org(dff: pl.DataFrame, query: str, org_type: str) -> pl.DataFrame:
     """
     Search in either 'acheteur' or 'titulaire' DataFrame.
 
-    :param dff: Polars DataFrame with acheteur or titulaire columns
+    The frame must come from `build_org_frame` (src/utils/data.py): it carries
+    a precomputed `recherche_normalisee` column, against which the query is
+    matched case- and accent-insensitively (#150).
+
+    :param dff: Polars DataFrame built by `build_org_frame`
     :param query: User search string
     :param org_type: 'acheteur' or 'titulaire'
     :return: Filtered DataFrame with 'matches' column
@@ -16,9 +20,10 @@ def search_org(dff: pl.DataFrame, query: str, org_type: str) -> pl.DataFrame:
     if not query.strip():
         return dff.select(pl.lit(False).alias("matches"))
 
-    # Normalize query
-    normalized_query = unidecode(query.strip()).upper()
-    tokens = [" " + t.strip() for t in normalized_query.split() if t.strip()]
+    # Normalize query the same way `build_org_frame` normalized the frame:
+    # lowercase, no accents, hyphens as spaces.
+    normalized_query = normalize_text(query.strip()).lower().replace("-", " ")
+    tokens = [" " + token for token in normalized_query.split() if token]
 
     # Define columns based on entity type
     cols = [
@@ -29,37 +34,33 @@ def search_org(dff: pl.DataFrame, query: str, org_type: str) -> pl.DataFrame:
         f"{org_type}_commune_nom",
     ]
 
-    # Concatenate all fields into one string per row
-    org_str = pl.concat_str(pl.lit(" "), pl.col(cols), separator=" ").str.replace(
-        "-", " "
-    )
-
     # For each token, create a boolean column: True if token is found
-    token_matches = []
-    for token in tokens:
-        token_match = org_str.str.contains(token).alias(f"token_{token}")
-        token_matches.append(token_match)
+    # (literal match: the query is never a regular expression).
+    token_matches = [
+        pl.col(COLONNE_RECHERCHE)
+        .str.contains(token, literal=True)
+        .alias(f"token_{token}")
+        for token in tokens
+    ]
 
     # Count how many tokens match per row
     match_score = pl.sum_horizontal(token_matches).alias("match_score")
 
-    # For each token, create a boolean column: True if token is found
-    token_matches = []
-    for token in tokens:
-        token_match = org_str.str.contains(token).alias(f"token_{token}")
-        token_matches.append(token_match)
-
-    # Sélection des colonnes
+    # Column selection
     if org_type == "acheteur":
-        dff = dff.select(cols + ["Marchés"])
+        dff = dff.select(cols + ["Marchés", COLONNE_RECHERCHE])
     if org_type == "titulaire":
-        dff = dff.select(cols + ["Marchés", "titulaire_typeIdentifiant"])
+        dff = dff.select(
+            cols + ["Marchés", "titulaire_typeIdentifiant", COLONNE_RECHERCHE]
+        )
 
     # Apply and filter
     dff = (
         dff.with_columns(token_matches + [match_score])
         .filter(pl.col("match_score") == len(tokens))
-        .drop([f"token_{token}" for token in tokens])
+        .drop(
+            [f"token_{token}" for token in tokens] + [COLONNE_RECHERCHE, "match_score"]
+        )
     )
 
     # Format result

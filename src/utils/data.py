@@ -10,6 +10,7 @@ from httpx import HTTPError, get
 from src.db import get_cursor, query_marches, schema
 from src.utils import logger
 from src.utils.cache import cache
+from src.utils.text_normalization import COLONNE_RECHERCHE, normalize_text_sql
 
 logging.getLogger("httpx").setLevel("WARNING")
 
@@ -205,7 +206,24 @@ def build_org_frame(org_type: str) -> pl.DataFrame:
     ]
     select_list = ", ".join(org_cols)
     group_list = ", ".join(org_cols)
-    sql = f'SELECT {select_list}, COUNT(*) AS "Marchés" FROM decp GROUP BY {group_list}'
+    # Colonne technique de recherche (#150) : les champs cherchés par
+    # `search_org`, concaténés, en minuscules, sans accents ni traits d'union.
+    # Précalculée ici une fois au démarrage plutôt qu'à chaque recherche.
+    champs_recherches = [
+        f"{org_type}_id",
+        f"{org_type}_nom",
+        f"{org_type}_departement_nom",
+        f"{org_type}_departement_code",
+        f"{org_type}_commune_nom",
+    ]
+    concat = f"' ' || concat_ws(' ', {', '.join(champs_recherches)})"
+    sans_tirets = f"replace({concat}, '-', ' ')"
+    recherche = f"lower({normalize_text_sql(sans_tirets)})"
+    sql = (
+        f'SELECT *, {recherche} AS "{COLONNE_RECHERCHE}" '
+        f'FROM (SELECT {select_list}, COUNT(*) AS "Marchés" '
+        f"FROM decp GROUP BY {group_list})"
+    )
     return get_cursor().execute(sql).pl()
 
 

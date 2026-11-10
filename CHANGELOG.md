@@ -1,3 +1,7 @@
+##### 3.3.2 (10 novembre 2026)
+
+- Les filtres sur les noms d'acheteurs et de titulaires (tableaux, API REST, connecteur IA) et la recherche d'organismes de la page d'accueil sont insensibles à la casse et aux accents ([#150](https://github.com/colinmaudry/colibre/issues/150))
+
 ##### 3.3.1 (18 octobre 2026)
 
 - Dans les tableaux, les filtres de colonnes ne s'appliquent plus à chaque caractère tapé : il faut valider avec Entrée (ou le bouton « Appliquer » du menu du filtre)
